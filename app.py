@@ -618,6 +618,62 @@ def project_view(project_id):
                            critical_stages=critical_stages,
                            overdue_in_project=overdue_in_project)
 
+@app.route('/update_completion_ajax/<int:project_id>', methods=['POST'])
+@login_required
+def update_completion_ajax(project_id):
+    project = Project.query.get_or_404(project_id)
+    if project.user_id != current_user.id:
+        return json.jsonify({'success': False, 'error': 'Access denied'})
+    
+    data = request.get_json()
+    stage_id = data.get('stage_id')
+    percent = int(data.get('percent'))
+    
+    stage = Stage.query.get_or_404(stage_id)
+    if stage.project_id != project_id:
+        return json.jsonify({'success': False, 'error': 'Stage not in project'})
+    
+    stage.percent_complete = percent
+    if percent >= 100:
+        stage.actual_end_date = datetime.now().date()
+    else:
+        stage.actual_end_date = None
+    
+    db.session.commit()
+    
+    return json.jsonify({'success': True})
+
+@app.route('/get_project_progress/<int:project_id>')
+@login_required
+def get_project_progress(project_id):
+    project = Project.query.get_or_404(project_id)
+    if project.user_id != current_user.id:
+        return json.jsonify({'success': False, 'error': 'Access denied'})
+    
+    stages = Stage.query.filter_by(project_id=project_id).all()
+    total_stages = len(stages)
+    completed_stages = len([s for s in stages if s.percent_complete >= 100])
+    overall_progress = int(completed_stages / total_stages * 100) if total_stages > 0 else 0
+    
+    return json.jsonify({'success': True, 'overall_progress': overall_progress})
+
+@app.route('/get_project_budget/<int:project_id>')
+@login_required
+def get_project_budget(project_id):
+    project = Project.query.get_or_404(project_id)
+    if project.user_id != current_user.id:
+        return json.jsonify({'success': False, 'error': 'Access denied'})
+    
+    stages = Stage.query.filter_by(project_id=project_id).all()
+    total_planned = sum(s.planned_material_cost + s.planned_labor_cost for s in stages)
+    total_actual = sum(s.actual_material_cost + s.actual_labor_cost for s in stages)
+    
+    return json.jsonify({
+        'success': True,
+        'total_planned': total_planned,
+        'total_actual': total_actual
+    })
+
 @app.route('/project_calendar/<int:project_id>')
 @login_required
 def project_calendar(project_id):
