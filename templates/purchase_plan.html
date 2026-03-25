@@ -1,0 +1,111 @@
+{% extends "base.html" %}
+{% block content %}
+<h1>📦 План закупок: {{ project.name }}</h1>
+<p style="color:#64748b; margin-bottom:1.5rem;">Автоматически сформированный на основе графика этапов</p>
+
+<div style="margin-bottom: 1rem;">
+    <a href="{{ url_for('generate_purchase_plan', project_id=project.id) }}" class="card" style="display:inline-block; padding:0.75rem 1.5rem; text-decoration:none; background:#3b82f6; color:white; border-radius:8px;">🔄 Сформировать план закупок</a>
+    <a href="{{ url_for('project_view', project_id=project.id) }}" class="card" style="display:inline-block; padding:0.75rem 1.5rem; text-decoration:none; margin-left:1rem;">← Вернуться к проекту</a>
+</div>
+
+{% if purchase_orders %}
+    {% for order in purchase_orders %}
+    <div class="card" style="margin-bottom: 1.5rem;">
+        <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap;">
+            <h2 style="margin-top:0;">📋 Заказ №{{ order.order_number }}</h2>
+            <div>
+                {% if order.status == 'pending' %}
+                    <span style="background: #f59e0b; color: white; padding: 4px 12px; border-radius: 20px;">⏳ Ожидает заказа</span>
+                {% elif order.status == 'ordered' %}
+                    <span style="background: #3b82f6; color: white; padding: 4px 12px; border-radius: 20px;">📦 Заказан</span>
+                {% elif order.status == 'delivered' %}
+                    <span style="background: #10b981; color: white; padding: 4px 12px; border-radius: 20px;">✅ Доставлен</span>
+                {% else %}
+                    <span style="background: #ef4444; color: white; padding: 4px 12px; border-radius: 20px;">❌ Отменён</span>
+                {% endif %}
+            </div>
+        </div>
+        
+        <div style="display: flex; gap: 2rem; flex-wrap: wrap; margin-top: 0.5rem;">
+            <div><strong>Поставщик:</strong> {{ order.supplier or 'Не указан' }}</div>
+            <div><strong>Дата заказа:</strong> {{ order.order_date.strftime('%d.%m.%Y') }}</div>
+            {% if order.delivery_date %}
+            <div><strong>План доставки:</strong> {{ order.delivery_date.strftime('%d.%m.%Y') }}</div>
+            {% endif %}
+            <div><strong>Сумма:</strong> {{ "%.2f"|format(order.total_amount) }} ₽</div>
+        </div>
+        
+        <h3 style="margin: 1rem 0 0.5rem 0;">📋 Состав заказа</h3>
+        <div style="overflow-x: auto;">
+            <table style="width:100%;">
+                <thead>
+                    <tr style="background:#f1f5f9;">
+                        <th style="padding: 8px;">Материал</th>
+                        <th style="padding: 8px;">Количество</th>
+                        <th style="padding: 8px;">Ед. изм.</th>
+                        <th style="padding: 8px;">Цена</th>
+                        <th style="padding: 8px;">Сумма</th>
+                        <th style="padding: 8px;">Этап</th>
+                        <th style="padding: 8px;">Статус</th>
+                       </tr>
+                </thead>
+                <tbody>
+                    {% for item in order.items %}
+                    <tr style="border-bottom: 1px solid #e2e8f0;">
+                        <td style="padding: 8px;"><strong>{{ item.material_name }}</strong></td>
+                        <td style="padding: 8px;">{{ item.quantity }}</td>
+                        <td style="padding: 8px;">{{ item.unit }}</td>
+                        <td style="padding: 8px;">{{ "%.2f"|format(item.unit_price) }} ₽</td>
+                        <td style="padding: 8px;">{{ "%.2f"|format(item.total_price) }} ₽</td>
+                        <td style="padding: 8px;">
+                            <a href="{{ url_for('project_view', project_id=project.id) }}">{{ item.stage.name }}</a>
+                        </td>
+                        <td style="padding: 8px;">
+                            {% if item.status == 'pending' %}
+                                <span style="color:#f59e0b;">⏳</span>
+                            {% elif item.status == 'ordered' %}
+                                <span style="color:#3b82f6;">📦</span>
+                            {% elif item.status == 'received' %}
+                                <span style="color:#10b981;">✅</span>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+                <tfoot>
+                    <tr style="background:#f8fafc;">
+                        <td colspan="4" style="padding: 8px; text-align: right;"><strong>Итого:</strong></td>
+                        <td style="padding: 8px;"><strong>{{ "%.2f"|format(order.total_amount) }} ₽</strong></td>
+                        <td colspan="2"></td>
+                    </tr>
+                </tfoot>
+            </table>
+        </div>
+        
+        <div style="margin-top: 1rem; display: flex; gap: 0.5rem;">
+            <a href="{{ url_for('update_order_status', order_id=order.id, status='ordered') }}" class="card" style="display:inline-block; padding:0.5rem 1rem; text-decoration:none; background:#3b82f6; color:white; border-radius:6px;">📦 Отметить заказанным</a>
+            <a href="{{ url_for('update_order_status', order_id=order.id, status='delivered') }}" class="card" style="display:inline-block; padding:0.5rem 1rem; text-decoration:none; background:#10b981; color:white; border-radius:6px;">✅ Отметить доставленным</a>
+            <a href="{{ url_for('delete_order', order_id=order.id) }}" onclick="return confirm('Удалить заказ?')" class="card" style="display:inline-block; padding:0.5rem 1rem; text-decoration:none; background:#ef4444; color:white; border-radius:6px;">🗑️ Удалить</a>
+        </div>
+    </div>
+    {% endfor %}
+{% else %}
+<div class="card" style="text-align:center;">
+    <p style="font-size:3rem; margin-bottom:0.5rem;">📦</p>
+    <p>Нет сформированных заказов</p>
+    <p style="font-size:0.875rem; color:#64748b;">Нажмите кнопку "Сформировать план закупок", чтобы создать заказы на основе этапов</p>
+</div>
+{% endif %}
+
+<style>
+    .card {
+        background: white;
+        border-radius: 12px;
+        border: 1px solid #e2e8f0;
+        padding: 1.5rem;
+    }
+    table {
+        border-collapse: collapse;
+    }
+</style>
+{% endblock %}

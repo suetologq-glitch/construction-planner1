@@ -1,0 +1,33 @@
+{% extends "base.html" %}
+{% block content %}
+<h1>📸 Фотоотчёты</h1>
+<p style="color:#64748b; margin-bottom:1.5rem;">Проект: {{ project.name }}</p>
+
+{% if photos %}
+<div class="photo-grid">
+    {% for photo in photos %}
+    <div class="photo-card">
+        <img src="{{ url_for('static', filename=photo.filepath) }}" alt="{{ photo.stage_name }}">
+        <div class="photo-info">
+            <div class="photo-stage">🏗️ {{ photo.stage_name }}</div>
+            <div class="photo-caption">📝 {{ photo.caption or 'Без подписи' }}</div>
+            <div class="photo-meta">👤 {{ photo.telegram_user }} • {{ photo.created_at.strftime('%d.%m.%Y %H:%M') }}</div>
+        </div>
+    </div>
+    {% endfor %}
+</div>
+{% else %}
+<div class="card" style="text-align:center;">
+    <p style="font-size:3rem; margin-bottom:0.5rem;">📭</p>
+    <p>Нет фотоотчётов</p>
+    <p style="font-size:0.875rem; color:#64748b; margin-top:0.5rem;">
+        Отправьте фото через Telegram-бота:<br>
+        /projects → /select [номер] → фото с подписью "Этап: описание"
+    </p>
+</div>
+{% endif %}
+
+<p style="margin-top:1.5rem;">
+    <a href="{{ url_for('project_view', project_id=project.id) }}">← Вернуться к проекту</a>
+</p>
+{% endblock %}

@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <title>Отчёт по проекту {{ project.name }}</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 40px;
+            color: #333;
+        }
+        h1 {
+            color: #3b82f6;
+            border-bottom: 2px solid #3b82f6;
+            padding-bottom: 10px;
+        }
+        .header {
+            margin-bottom: 30px;
+        }
+        .info {
+            background: #f5f5f5;
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 20px;
+        }
+        th, td {
+            border: 1px solid #ddd;
+            padding: 8px;
+            text-align: left;
+        }
+        th {
+            background-color: #3b82f6;
+            color: white;
+        }
+        .budget {
+            margin-top: 30px;
+            padding: 15px;
+            background: #e8f4fd;
+            border-radius: 8px;
+        }
+        .footer {
+            margin-top: 50px;
+            text-align: center;
+            font-size: 12px;
+            color: #999;
+            border-top: 1px solid #ddd;
+            padding-top: 20px;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>📋 Отчёт по проекту: {{ project.name }}</h1>
+        <p>Дата создания: {{ now.strftime('%d.%m.%Y %H:%M') }}</p>
+    </div>
+    
+    <div class="info">
+        <p><strong>📍 Адрес:</strong> {{ project.address or 'Не указан' }}</p>
+        <p><strong>📅 Дата начала:</strong> {{ project.start_date.strftime('%d.%m.%Y') }}</p>
+        <p><strong>📊 Координаты:</strong> {{ "%.6f"|format(project.latitude) }}, {{ "%.6f"|format(project.longitude) }}</p>
+    </div>
+    
+    <h2>📋 Этапы работ</h2>
+    <table>
+        <thead>
+            <tr>
+                <th>Название</th>
+                <th>Длит.</th>
+                <th>Зависит от</th>
+                <th>Ресурсы</th>
+                <th>План начало</th>
+                <th>План конец</th>
+                <th>Выполнено</th>
+                <th>Бюджет</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for stage in stages %}
+            <tr>
+                <td>{{ stage.name }}</td>
+                <td>{{ stage.planned_duration }} дн.</td>
+                <td>
+                    {% set deps = stage.dependencies.all() %}
+                    {% for dep in deps %}
+                        {{ dep.depends_on_stage.name }}{% if not loop.last %}, {% endif %}
+                    {% endfor %}
+                </td>
+                <td>{{ assignments.get(stage.id, [])|join(', ') }}</td>
+                <td>{% if dates.get(stage.id) %}{{ dates[stage.id][0].strftime('%d.%m.%Y') }}{% else %}—{% endif %}</td>
+                <td>{% if dates.get(stage.id) %}{{ dates[stage.id][1].strftime('%d.%m.%Y') }}{% else %}—{% endif %}</td>
+                <td>{{ stage.percent_complete }}%</td>
+                <td>{{ "%.0f"|format(stage.planned_material_cost + stage.planned_labor_cost) }} ₽</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    
+    <div class="budget">
+        <h3>💰 Сводный бюджет</h3>
+        <p><strong>Плановый бюджет:</strong> {{ "%.2f"|format(total_planned) }} ₽</p>
+        <p><strong>Фактические затраты:</strong> {{ "%.2f"|format(total_actual) }} ₽</p>
+        {% set diff = total_actual - total_planned %}
+        <p><strong>Отклонение:</strong> 
+            {% if diff > 0 %}↑ Перерасход: {{ "%.2f"|format(diff) }} ₽
+            {% elif diff < 0 %}↓ Экономия: {{ "%.2f"|format(0 - diff) }} ₽
+            {% else %}В рамках бюджета{% endif %}
+        </p>
+    </div>
+    
+    <div class="footer">
+        <p>Строительный планировщик — автоматизация управления строительством</p>
+    </div>
+</body>
+</html>

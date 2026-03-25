@@ -1,0 +1,23 @@
+{% extends "base.html" %}
+{% block content %}
+<h1>Ресурсы (бригады)</h1>
+
+{% if resources %}
+<ul>
+    {% for r in resources %}
+    <li>
+        {{ r.name }}
+        <a href="{{ url_for('delete_resource', resource_id=r.id) }}" onclick="return confirm('Удалить ресурс?')" style="color:red; margin-left:10px;">[Удалить]</a>
+    </li>
+    {% endfor %}
+</ul>
+{% else %}
+<p>Нет добавленных ресурсов. Добавьте первую бригаду!</p>
+{% endif %}
+
+<h2>Добавить ресурс</h2>
+<form action="{{ url_for('add_resource') }}" method="post">
+    <input type="text" name="name" placeholder="Название бригады" required>
+    <button type="submit">Добавить</button>
+</form>
+{% endblock %}

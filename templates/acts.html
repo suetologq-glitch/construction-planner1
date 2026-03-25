@@ -1,0 +1,90 @@
+{% extends "base.html" %}
+{% block content %}
+<h1>📄 Акты выполненных работ (КС-2, КС-3)</h1>
+<p style="color:#64748b; margin-bottom:1.5rem;">Проект: {{ project.name }}</p>
+
+<div style="margin-bottom: 1rem;">
+    <a href="{{ url_for('generate_act', project_id=project.id) }}" class="card" style="display:inline-block; padding:0.75rem 1.5rem; text-decoration:none; background:#3b82f6; color:white; border-radius:8px;">📄 Сформировать акт КС-2</a>
+    <a href="{{ url_for('project_view', project_id=project.id) }}" class="card" style="display:inline-block; padding:0.75rem 1.5rem; text-decoration:none; margin-left:1rem;">← Вернуться к проекту</a>
+</div>
+
+{% if acts %}
+    {% for act in acts %}
+    <div class="card" style="margin-bottom: 1.5rem;">
+        <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap;">
+            <h2 style="margin-top:0;">📋 Акт №{{ act.act_number }}</h2>
+            <div>
+                {% if act.status == 'draft' %}
+                    <span style="background: #f59e0b; color: white; padding: 4px 12px; border-radius: 20px;">📝 Черновик</span>
+                {% elif act.status == 'signed' %}
+                    <span style="background: #10b981; color: white; padding: 4px 12px; border-radius: 20px;">✅ Подписан</span>
+                {% endif %}
+            </div>
+        </div>
+        
+        <div style="display: flex; gap: 2rem; flex-wrap: wrap; margin-top: 0.5rem;">
+            <div><strong>Дата акта:</strong> {{ act.act_date.strftime('%d.%m.%Y') }}</div>
+            <div><strong>Период:</strong> {{ act.period_start.strftime('%d.%m.%Y') }} — {{ act.period_end.strftime('%d.%m.%Y') }}</div>
+            <div><strong>Сумма:</strong> {{ "%.2f"|format(act.total_amount) }} ₽</div>
+        </div>
+        
+        <h3 style="margin: 1rem 0 0.5rem 0;">📋 Выполненные работы</h3>
+        <div style="overflow-x: auto;">
+            <table style="width:100%;">
+                <thead>
+                    <tr style="background:#f1f5f9;">
+                        <th style="padding: 8px;">№</th>
+                        <th style="padding: 8px;">Наименование работ</th>
+                        <th style="padding: 8px;">Ед. изм.</th>
+                        <th style="padding: 8px;">Количество</th>
+                        <th style="padding: 8px;">Цена</th>
+                        <th style="padding: 8px;">Сумма</th>
+                       </tr>
+                </thead>
+                <tbody>
+                    {% for item in act.items %}
+                    <tr style="border-bottom: 1px solid #e2e8f0;">
+                        <td style="padding: 8px;">{{ loop.index }}</td>
+                        <td style="padding: 8px;">{{ item.work_name }}</td>
+                        <td style="padding: 8px;">{{ item.unit }}</td>
+                        <td style="padding: 8px;">{{ item.quantity }}</td>
+                        <td style="padding: 8px;">{{ "%.2f"|format(item.unit_price) }} ₽</td>
+                        <td style="padding: 8px;">{{ "%.2f"|format(item.total_price) }} ₽</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+                <tfoot>
+                    <tr style="background:#f8fafc;">
+                        <td colspan="5" style="padding: 8px; text-align: right;"><strong>Итого:</strong></td>
+                        <td style="padding: 8px;"><strong>{{ "%.2f"|format(act.total_amount) }} ₽</strong></td>
+                    </tr>
+                </tfoot>
+            </table>
+        </div>
+        
+        <div style="margin-top: 1rem; display: flex; gap: 0.5rem;">
+            <a href="{{ url_for('sign_act', act_id=act.id) }}" class="card" style="display:inline-block; padding:0.5rem 1rem; text-decoration:none; background:#3b82f6; color:white; border-radius:6px;">✍️ Подписать акт</a>
+            <a href="{{ url_for('delete_act', act_id=act.id) }}" onclick="return confirm('Удалить акт?')" class="card" style="display:inline-block; padding:0.5rem 1rem; text-decoration:none; background:#ef4444; color:white; border-radius:6px;">🗑️ Удалить</a>
+        </div>
+    </div>
+    {% endfor %}
+{% else %}
+<div class="card" style="text-align:center;">
+    <p style="font-size:3rem; margin-bottom:0.5rem;">📄</p>
+    <p>Нет сформированных актов</p>
+    <p style="font-size:0.875rem; color:#64748b;">Нажмите кнопку "Сформировать акт КС-2", чтобы создать акт на основе завершённых этапов</p>
+</div>
+{% endif %}
+
+<style>
+    .card {
+        background: white;
+        border-radius: 12px;
+        border: 1px solid #e2e8f0;
+        padding: 1.5rem;
+    }
+    table {
+        border-collapse: collapse;
+    }
+</style>
+{% endblock %}

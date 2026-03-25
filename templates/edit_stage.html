@@ -1,0 +1,69 @@
+{% extends "base.html" %}
+{% block content %}
+<h1>{% if stage %}Редактирование этапа{% else %}Добавление этапа{% endif %}</h1>
+<p>Проект: {{ project.name }}</p>
+
+<!-- Редактирование адреса проекта -->
+<div class="card" style="margin-bottom: 1.5rem;">
+    <h3 style="margin-top:0;">📍 Местоположение объекта</h3>
+    <form action="{{ url_for('update_project_address', project_id=project.id) }}" method="post" style="padding:0; margin:0;">
+        <label>Адрес:</label>
+        <input type="text" name="address" value="{{ project.address or '' }}" placeholder="Введите адрес">
+        
+        <div style="display: flex; gap: 1rem; margin-top: 0.5rem;">
+            <div style="flex:1;">
+                <label>Широта:</label>
+                <input type="text" name="latitude" value="{{ project.latitude }}">
+            </div>
+            <div style="flex:1;">
+                <label>Долгота:</label>
+                <input type="text" name="longitude" value="{{ project.longitude }}">
+            </div>
+        </div>
+        
+        <button type="submit">Сохранить местоположение</button>
+    </form>
+</div>
+
+<form method="post">
+    <label>Название: <input type="text" name="name" value="{{ stage.name if stage else '' }}" required></label><br><br>
+    <label>Длительность (дни): <input type="number" name="duration" min="1" value="{{ stage.planned_duration if stage else 1 }}" required></label><br><br>
+
+    {% if stage %}
+    <label>Процент выполнения: <input type="number" name="percent_complete" min="0" max="100" value="{{ stage.percent_complete }}"></label><br><br>
+    {% endif %}
+
+    <hr>
+    <h3>Смета и бюджет</h3>
+    
+    <label>Плановая стоимость материалов (руб): <input type="number" name="planned_material_cost" step="0.01" min="0" value="{{ stage.planned_material_cost if stage else 0 }}"></label><br><br>
+    
+    <label>Плановая стоимость работ (руб): <input type="number" name="planned_labor_cost" step="0.01" min="0" value="{{ stage.planned_labor_cost if stage else 0 }}"></label><br><br>
+    
+    {% if stage %}
+    <hr>
+    <h4>Фактические затраты (заполняются по мере выполнения)</h4>
+    <label>Фактическая стоимость материалов (руб): <input type="number" name="actual_material_cost" step="0.01" min="0" value="{{ stage.actual_material_cost }}"></label><br><br>
+    
+    <label>Фактическая стоимость работ (руб): <input type="number" name="actual_labor_cost" step="0.01" min="0" value="{{ stage.actual_labor_cost }}"></label><br><br>
+    {% endif %}
+
+    <hr>
+    <h3>Зависимости и ресурсы</h3>
+    
+    <label>Зависимости (от каких этапов зависит):</label><br>
+    {% for s in existing_stages %}
+        <input type="checkbox" name="depends" value="{{ s.id }}" {% if s.id in current_depends %}checked{% endif %}> {{ s.name }}<br>
+    {% endfor %}
+    <br>
+
+    <label>Назначенные ресурсы:</label><br>
+    {% for r in all_resources %}
+        <input type="checkbox" name="resources" value="{{ r.id }}" {% if r.id in current_resources %}checked{% endif %}> {{ r.name }}<br>
+    {% endfor %}
+    <br>
+
+    <button type="submit">Сохранить</button>
+    <a href="{{ url_for('project_view', project_id=project.id) }}">Отмена</a>
+</form>
+{% endblock %}

@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Строительный планировщик</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+    <nav>
+        <a href="{{ url_for('index') }}">🏗️ Проекты</a>
+        <a href="{{ url_for('dashboard') }}">📊 Дашборд</a>
+        <a href="{{ url_for('executive_dashboard') }}">👔 Дашборд руководителя</a>
+        <a href="{{ url_for('resources_list') }}">👥 Ресурсы</a>
+        <a href="{{ url_for('resource_calendar') }}">📅 Календарь ресурсов</a>
+        
+        <div style="float: right;">
+            {% if current_user.is_authenticated %}
+                <span style="color: white; margin-right: 1rem;">👤 {{ current_user.username }}</span>
+                <a href="{{ url_for('logout') }}" style="color: white;">🚪 Выход</a>
+            {% else %}
+                <a href="{{ url_for('login') }}" style="color: white;">🔐 Вход</a>
+                <a href="{{ url_for('register') }}" style="color: white; margin-left: 1rem;">📝 Регистрация</a>
+            {% endif %}
+        </div>
+    </nav>
+    <main>
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                <ul class="flashes">
+                {% for category, message in messages %}
+                    <li class="{{ category }}">{{ message }}</li>
+                {% endfor %}
+                </ul>
+            {% endif %}
+        {% endwith %}
+        {% block content %}{% endblock %}
+    </main>
+</body>
+</html>

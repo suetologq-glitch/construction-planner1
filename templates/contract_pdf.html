@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <title>Договор №{{ contract.contract_number }}</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 40px;
+            line-height: 1.5;
+        }
+        h1 {
+            text-align: center;
+            font-size: 20px;
+        }
+        .header {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        .section {
+            margin-top: 20px;
+        }
+        .section-title {
+            font-weight: bold;
+            font-size: 16px;
+            margin-bottom: 10px;
+        }
+        .signatures {
+            margin-top: 50px;
+            display: flex;
+            justify-content: space-between;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>ДОГОВОР ПОДРЯДА № {{ contract.contract_number }}</h1>
+        <p>г. {{ project.address.split(',')[0] if project.address else 'Москва' }} «____» __________ 2026 г.</p>
+    </div>
+    
+    <div class="section">
+        <div class="section-title">1. СТОРОНЫ ДОГОВОРА</div>
+        <p><strong>Заказчик:</strong> {{ project.name }}</p>
+        <p><strong>Подрядчик:</strong> {{ contract.contractor_name }}</p>
+        <p><strong>ИНН:</strong> {{ contract.contractor_inn or '—' }}</p>
+        <p><strong>Телефон:</strong> {{ contract.contractor_phone or '—' }}</p>
+        <p><strong>Email:</strong> {{ contract.contractor_email or '—' }}</p>
+    </div>
+    
+    <div class="section">
+        <div class="section-title">2. ПРЕДМЕТ ДОГОВОРА</div>
+        <p>Подрядчик обязуется выполнить строительные работы на объекте <strong>"{{ project.name }}"</strong>, расположенном по адресу: <strong>{{ project.address or 'не указан' }}</strong>, а Заказчик обязуется принять и оплатить выполненные работы.</p>
+    </div>
+    
+    <div class="section">
+        <div class="section-title">3. СРОКИ ВЫПОЛНЕНИЯ РАБОТ</div>
+        <p>Начало работ: {{ contract.start_date.strftime('%d.%m.%Y') }}</p>
+        {% if contract.end_date %}
+        <p>Окончание работ: {{ contract.end_date.strftime('%d.%m.%Y') }}</p>
+        {% endif %}
+    </div>
+    
+    <div class="section">
+        <div class="section-title">4. СТОИМОСТЬ РАБОТ И ПОРЯДОК РАСЧЕТОВ</div>
+        <p>Общая стоимость работ по договору составляет <strong>{{ "%.2f"|format(contract.total_amount) }} ({{ contract.total_amount|int|wordcount }}) рублей</strong>.</p>
+        <p>Оплата производится в следующем порядке:</p>
+        <p>- Аванс: 30% от стоимости работ</p>
+        <p>- Окончательный расчет: после подписания акта выполненных работ (КС-2)</p>
+    </div>
+    
+    <div class="section">
+        <div class="section-title">5. ОТВЕТСТВЕННОСТЬ СТОРОН</div>
+        <p>За нарушение сроков выполнения работ Подрядчик уплачивает неустойку в размере 0,1% от стоимости работ за каждый день просрочки.</p>
+        <p>За нарушение сроков оплаты Заказчик уплачивает неустойку в размере 0,1% от суммы задолженности за каждый день просрочки.</p>
+    </div>
+    
+    <div class="signatures">
+        <div>
+            <p><strong>Заказчик:</strong></p>
+            <p>____________________</p>
+            <p>{{ project.name }}</p>
+        </div>
+        <div>
+            <p><strong>Подрядчик:</strong></p>
+            <p>____________________</p>
+            <p>{{ contract.contractor_name }}</p>
+        </div>
+    </div>
+</body>
+</html>

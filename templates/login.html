@@ -1,0 +1,32 @@
+{% extends "base.html" %}
+{% block content %}
+<div style="max-width: 500px; margin: 0 auto;">
+    <div class="card">
+        <h1>🔐 Вход в систему</h1>
+        
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                {% for category, message in messages %}
+                    <div style="padding: 10px; background: {% if category == 'error' %}#fee2e2{% else %}#d4edda{% endif %}; border-radius: 8px; margin-bottom: 1rem;">
+                        {{ message }}
+                    </div>
+                {% endfor %}
+            {% endif %}
+        {% endwith %}
+        
+        <form method="post" style="padding:0; margin:0;">
+            <label>Email:</label>
+            <input type="email" name="email" required placeholder="email@example.com">
+            
+            <label>Пароль:</label>
+            <input type="password" name="password" required>
+            
+            <button type="submit" style="width:100%; margin-top:1rem;">Войти</button>
+        </form>
+        
+        <p style="margin-top:1rem; text-align:center;">
+            Нет аккаунта? <a href="{{ url_for('register') }}">Зарегистрироваться</a>
+        </p>
+    </div>
+</div>
+{% endblock %}

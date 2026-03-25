@@ -1,0 +1,124 @@
+{% extends "base.html" %}
+{% block content %}
+<h1>📅 Календарь загрузки ресурсов</h1>
+<p style="color:#64748b; margin-bottom:1.5rem;">Показывает занятость бригад на этапах работ</p>
+
+<!-- Фильтр по проектам -->
+<div class="card" style="margin-bottom:1.5rem;">
+    <h3 style="margin-top:0;">🔍 Фильтр по проекту</h3>
+    <form method="get" action="{{ url_for('resource_calendar') }}" style="padding:0; margin:0;">
+        <select name="project_id" onchange="this.form.submit()" style="width: auto; min-width: 200px;">
+            <option value="">Все проекты</option>
+            {% for project in projects %}
+                <option value="{{ project.id }}" {% if request.args.get('project_id')|int == project.id %}selected{% endif %}>
+                    {{ project.name }}
+                </option>
+            {% endfor %}
+        </select>
+    </form>
+</div>
+
+{% set selected_project_id = request.args.get('project_id', '')|int %}
+
+{% if resources %}
+    {% for resource in resources %}
+        {% set resource_tasks = assignments|selectattr('resource_id', 'equalto', resource.id)|list %}
+        
+        <!-- Фильтруем по выбранному проекту -->
+        {% if selected_project_id %}
+            {% set resource_tasks = resource_tasks|selectattr('project_id', 'equalto', selected_project_id)|list %}
+        {% endif %}
+        
+        {% if resource_tasks %}
+        <div class="card" style="margin-bottom:1.5rem;">
+            <h2 style="margin-top:0; display: flex; justify-content: space-between; align-items: center;">
+                <span>👥 {{ resource.name }}</span>
+                <span style="font-size:0.875rem; color:#64748b;">{{ resource_tasks|length }} задач</span>
+            </h2>
+            
+            <div style="overflow-x: auto;">
+                <table style="width:100%;">
+                    <thead>
+                        <tr style="background:#f1f5f9;">
+                            <th>Проект</th>
+                            <th>Этап</th>
+                            <th>Начало</th>
+                            <th>Окончание</th>
+                            <th>Длительность</th>
+                            <th>Прогресс</th>
+                            <th>Статус</th>
+                         </tr>
+                    </thead>
+                    <tbody>
+                        {% for task in resource_tasks|sort(attribute='start_date') %}
+                        <tr>
+                            <td>
+                                <a href="{{ url_for('project_view', project_id=task.project_id) }}">
+                                    {{ task.project_name }}
+                                </a>
+                            </td>
+                            <td>
+                                <strong>{{ task.stage_name }}</strong>
+                            </td>
+                            <td>{{ task.start_date.strftime('%d.%m.%Y') }}</td>
+                            <td>{{ task.end_date.strftime('%d.%m.%Y') }}</td>
+                            <td>{{ (task.end_date - task.start_date).days + 1 }} дн.</td>
+                            <td>
+                                <div style="display: flex; align-items: center; gap: 0.5rem;">
+                                    <div class="progress-container" style="flex:1; margin:0;">
+                                        <div class="progress-bar" style="width: {{ task.percent_complete }}%;"></div>
+                                    </div>
+                                    <span style="font-size:0.75rem; min-width: 45px;">{{ task.percent_complete }}%</span>
+                                </div>
+                            </td>
+                            <td>
+                                {% if task.percent_complete >= 100 %}
+                                    <span style="color:#10b981;">✅ Завершён</span>
+                                {% elif task.end_date < now %}
+                                    <span style="color:#ef4444;">⚠️ Просрочен</span>
+                                {% else %}
+                                    <span style="color:#3b82f6;">🔄 В работе</span>
+                                {% endif %}
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+        {% endif %}
+    {% endfor %}
+    
+    <!-- Если нет задач для выбранного фильтра -->
+    {% set has_tasks = false %}
+    {% for resource in resources %}
+        {% set resource_tasks = assignments|selectattr('resource_id', 'equalto', resource.id)|list %}
+        {% if selected_project_id %}
+            {% set resource_tasks = resource_tasks|selectattr('project_id', 'equalto', selected_project_id)|list %}
+        {% endif %}
+        {% if resource_tasks %}
+            {% set has_tasks = true %}
+        {% endif %}
+    {% endfor %}
+    
+    {% if not has_tasks %}
+        <div class="card" style="text-align:center;">
+            <p style="font-size:3rem; margin-bottom:0.5rem;">📭</p>
+            <p>Нет задач для выбранного проекта</p>
+            <p style="font-size:0.875rem; color:#64748b; margin-top:0.5rem;">
+                Выберите другой проект или добавьте этапы с назначенными ресурсами
+            </p>
+        </div>
+    {% endif %}
+    
+{% else %}
+<div class="card" style="text-align:center;">
+    <p style="font-size:3rem; margin-bottom:0.5rem;">👥</p>
+    <p>Нет добавленных ресурсов</p>
+    <p style="font-size:0.875rem; color:#64748b; margin-top:0.5rem;">
+        Создайте ресурсы (бригады) в разделе <a href="{{ url_for('resources_list') }}">Ресурсы</a>
+    </p>
+</div>
+{% endif %}
+
+{% endblock %}
