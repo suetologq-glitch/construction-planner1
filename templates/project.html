@@ -116,6 +116,253 @@
 </div>
 {% endif %}
 
+<!-- Генерация сметы по бюджету -->
+<div class="card" style="margin-bottom: 1.5rem; background: #f0fdf4; border-color: #22c55e;">
+    <h3 style="margin-top:0;">💰 Быстрая смета по бюджету</h3>
+    <p style="color:#64748b; margin-bottom:1rem;">Укажите бюджет, и система автоматически сгенерирует смету с реалистичными этапами</p>
+    
+    <form id="estimate-form" style="padding:0; margin:0;">
+        <div style="display: flex; gap: 1rem; flex-wrap: wrap; align-items: flex-end;">
+            <div style="flex: 2;">
+                <label>Бюджет (руб):</label>
+                <input type="number" id="budget-input" name="budget" min="50000" step="100000" placeholder="Например: 5000000" required style="width:100%;">
+            </div>
+            <div style="flex: 1;">
+                <label>Тип объекта:</label>
+                <select id="project-type" style="width:100%;">
+                    <option value="house">🏠 Загородный дом</option>
+                    <option value="apartment">🏢 Квартира</option>
+                    <option value="commercial">🏭 Коммерческое здание</option>
+                </select>
+            </div>
+            <div style="flex: 1;">
+                <label>Качество отделки:</label>
+                <select id="quality" style="width:100%;">
+                    <option value="econom">💰 Эконом</option>
+                    <option value="standard">⭐ Стандарт</option>
+                    <option value="premium">👑 Премиум</option>
+                </select>
+            </div>
+            <div>
+                <button type="submit" style="background:#22c55e; padding:0.625rem 1.5rem;">📊 Сгенерировать смету</button>
+            </div>
+        </div>
+    </form>
+    
+    <div id="estimate-result" style="display: none; margin-top: 1.5rem;">
+        <h4>📋 Сгенерированная смета</h4>
+        <div style="overflow-x: auto; max-height: 400px; overflow-y: auto;">
+            <table id="estimate-table" style="width:100%; border-collapse: collapse;">
+                <thead>
+                    <tr style="background:#f1f5f9; position: sticky; top: 0;">
+                        <th style="padding: 8px; border: 1px solid #e2e8f0;">Название</th>
+                        <th style="padding: 8px; border: 1px solid #e2e8f0;">Длит.</th>
+                        <th style="padding: 8px; border: 1px solid #e2e8f0;">Зависит от</th>
+                        <th style="padding: 8px; border: 1px solid #e2e8f0;">Ресурсы</th>
+                        <th style="padding: 8px; border: 1px solid #e2e8f0;">План начало</th>
+                        <th style="padding: 8px; border: 1px solid #e2e8f0;">План конец</th>
+                        <th style="padding: 8px; border: 1px solid #e2e8f0;">Бюджет</th>
+                        <th style="padding: 8px; border: 1px solid #e2e8f0;">Выполнено</th>
+                        <th style="padding: 8px; border: 1px solid #e2e8f0;"></th>
+                    <tr>
+                </thead>
+                <tbody id="estimate-tbody">
+                </tbody>
+                <tfoot>
+                    <tr style="background:#f8fafc; font-weight: bold;">
+                        <td colspan="6" style="padding: 8px; text-align: right;">ИТОГО:</td>
+                        <td id="estimate-total" style="padding: 8px;">0 ₽</td>
+                        <td colspan="2"></td>
+                    </tr>
+                </tfoot>
+            </table>
+        </div>
+        <div style="margin-top: 1rem; display: flex; gap: 1rem;">
+            <button id="apply-estimate-btn" style="background:#3b82f6;">➕ Добавить этапы в проект</button>
+            <button id="cancel-estimate-btn" style="background:#ef4444;">Отменить</button>
+        </div>
+    </div>
+</div>
+
+<script>
+    let currentEstimate = [];
+    
+    document.getElementById('estimate-form').addEventListener('submit', async function(e) {
+        e.preventDefault();
+        
+        const budget = document.getElementById('budget-input').value;
+        const type = document.getElementById('project-type').value;
+        const quality = document.getElementById('quality').value;
+        
+        if (!budget || budget < 50000) {
+            alert('Введите бюджет не менее 50 000 рублей');
+            return;
+        }
+        
+        const submitBtn = this.querySelector('button[type="submit"]');
+        const originalText = submitBtn.textContent;
+        submitBtn.textContent = '⏳ Генерация...';
+        submitBtn.disabled = true;
+        
+        try {
+            const response = await fetch('/api/generate_estimate_by_budget', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    budget: parseInt(budget),
+                    type: type,
+                    quality: quality,
+                    project_id: {{ project.id }}
+                })
+            });
+            
+            const data = await response.json();
+            
+            if (data.success) {
+                currentEstimate = data.stages;
+                renderEstimateTable(currentEstimate);
+                document.getElementById('estimate-result').style.display = 'block';
+                document.getElementById('estimate-result').scrollIntoView({ behavior: 'smooth' });
+            } else {
+                alert('Ошибка: ' + data.error);
+            }
+        } catch (error) {
+            alert('Ошибка при генерации сметы');
+        } finally {
+            submitBtn.textContent = originalText;
+            submitBtn.disabled = false;
+        }
+    });
+    
+    function renderEstimateTable(stages) {
+        const tbody = document.getElementById('estimate-tbody');
+        tbody.innerHTML = '';
+        let total = 0;
+        
+        const startDate = new Date();
+        
+        stages.forEach((stage, index) => {
+            const row = tbody.insertRow();
+            
+            row.insertCell(0).innerHTML = `<strong>${escapeHtml(stage.name)}</strong>`;
+            row.insertCell(1).textContent = stage.duration + ' дн.';
+            row.insertCell(2).textContent = stage.depends_on || '—';
+            row.insertCell(3).textContent = stage.resources;
+            
+            let start = new Date(startDate);
+            let end = new Date(startDate);
+            
+            if (stage.depends_on && stage.depends_on !== '—') {
+                const prevStage = stages.find(s => s.name === stage.depends_on);
+                if (prevStage && prevStage.endDate) {
+                    start = new Date(prevStage.endDate);
+                    start.setDate(start.getDate() + 1);
+                }
+            } else if (index > 0) {
+                const prevStage = stages[index - 1];
+                if (prevStage && prevStage.endDate) {
+                    start = new Date(prevStage.endDate);
+                    start.setDate(start.getDate() + 1);
+                }
+            }
+            
+            end = new Date(start);
+            end.setDate(start.getDate() + stage.duration - 1);
+            
+            stage.startDate = start;
+            stage.endDate = end;
+            
+            row.insertCell(4).textContent = formatDate(start);
+            row.insertCell(5).textContent = formatDate(end);
+            row.insertCell(6).textContent = formatNumber(stage.budget) + ' ₽';
+            total += stage.budget;
+            row.insertCell(7).textContent = '0%';
+            
+            const checkCell = row.insertCell(8);
+            const checkbox = document.createElement('input');
+            checkbox.type = 'checkbox';
+            checkbox.checked = true;
+            checkbox.dataset.index = index;
+            checkbox.addEventListener('change', () => updateEstimateTotal());
+            checkCell.appendChild(checkbox);
+        });
+        
+        document.getElementById('estimate-total').textContent = formatNumber(total) + ' ₽';
+        window.estimateStages = stages;
+    }
+    
+    function updateEstimateTotal() {
+        let total = 0;
+        const checkboxes = document.querySelectorAll('#estimate-tbody input[type="checkbox"]');
+        checkboxes.forEach((cb, idx) => {
+            if (cb.checked && window.estimateStages && window.estimateStages[idx]) {
+                total += window.estimateStages[idx].budget;
+            }
+        });
+        document.getElementById('estimate-total').textContent = formatNumber(total) + ' ₽';
+    }
+    
+    function formatDate(date) {
+        return date.toLocaleDateString('ru-RU');
+    }
+    
+    function formatNumber(num) {
+        return num.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ' ');
+    }
+    
+    function escapeHtml(text) {
+        const div = document.createElement('div');
+        div.textContent = text;
+        return div.innerHTML;
+    }
+    
+    document.getElementById('apply-estimate-btn').addEventListener('click', async function() {
+        const checkboxes = document.querySelectorAll('#estimate-tbody input[type="checkbox"]:checked');
+        if (checkboxes.length === 0) {
+            alert('Выберите хотя бы один этап для добавления');
+            return;
+        }
+        
+        const selectedStages = [];
+        checkboxes.forEach(cb => {
+            const idx = parseInt(cb.dataset.index);
+            if (window.estimateStages && window.estimateStages[idx]) {
+                selectedStages.push(window.estimateStages[idx]);
+            }
+        });
+        
+        this.disabled = true;
+        this.textContent = '⏳ Добавление...';
+        
+        try {
+            const response = await fetch('/api/add_estimate_stages/{{ project.id }}', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ stages: selectedStages })
+            });
+            
+            const data = await response.json();
+            
+            if (data.success) {
+                alert(`✅ Добавлено ${data.count} этапов! Страница будет обновлена.`);
+                location.reload();
+            } else {
+                alert('Ошибка: ' + data.error);
+            }
+        } catch (error) {
+            alert('Ошибка при добавлении этапов');
+        } finally {
+            this.disabled = false;
+            this.textContent = '➕ Добавить этапы в проект';
+        }
+    });
+    
+    document.getElementById('cancel-estimate-btn').addEventListener('click', function() {
+        document.getElementById('estimate-result').style.display = 'none';
+        document.getElementById('budget-input').value = '';
+    });
+</script>
+
 <h2>📋 Этапы работ</h2>
 
 <style>
@@ -172,12 +419,12 @@
                 <th style="padding: 12px; border: 1px solid #e2e8f0;">Бюджет</th>
                 <th style="padding: 12px; border: 1px solid #e2e8f0;">Выполнено</th>
                 <th style="padding: 12px; border: 1px solid #e2e8f0;">Действия</th>
-                </tr>
+            </tr>
         </thead>
         <tbody>
             {% for stage in stages %}
             <tr>
-                <td style="padding: 10px; border: 1px solid #e2e8f0;"><strong>{{ stage.name }}</strong>{% if stage.id in critical_stages %} 🔴{% endif %}</td>
+                <td style="padding: 10px; border: 1px solid #e2e8f0;"><strong>{{ stage.name }}</strong>{% if stage.id in critical_stages %} 🔴{% endif %}{% if stage.id in overdue_in_project|map(attribute='stage')|map(attribute='id')|list %} ⏰{% endif %}</td>
                 <td style="padding: 10px; border: 1px solid #e2e8f0;">{{ stage.planned_duration }} дн.</td>
                 <td style="padding: 10px; border: 1px solid #e2e8f0;">
                     {% set deps = stage.dependencies.all() %}
@@ -213,12 +460,16 @@
                     {% endif %}
                 </td>
                 <td style="padding: 10px; border: 1px solid #e2e8f0; white-space: nowrap;">
-                    <form action="{{ url_for('update_completion', project_id=project.id) }}" method="post" style="display:inline; padding:0; margin:0;">
-                        <input type="hidden" name="stage_id" value="{{ stage.id }}">
-                        <input type="number" name="percent" min="0" max="100" value="{{ stage.percent_complete }}" style="width:70px; margin-bottom:0;">
-                        <button type="submit" style="padding:0.25rem 0.5rem;">Обн.</button>
-                    </form>
-                    <div style="font-size:0.75rem; margin-top:0.25rem;">{{ stage.percent_complete }}%</div>
+                    <div style="display: flex; align-items: center; gap: 0.5rem;">
+                        <input type="number" id="percent-{{ stage.id }}" 
+                               class="percent-input" 
+                               data-stage-id="{{ stage.id }}"
+                               min="0" max="100" 
+                               value="{{ stage.percent_complete }}" 
+                               style="width:70px; padding:0.25rem;">
+                        <button class="update-percent-btn" data-stage-id="{{ stage.id }}" style="padding:0.25rem 0.5rem;">Обн.</button>
+                    </div>
+                    <div class="percent-display-{{ stage.id }}" style="font-size:0.75rem; margin-top:0.25rem;">{{ stage.percent_complete }}%</div>
                 </td>
                 <td style="padding: 10px; border: 1px solid #e2e8f0; white-space: nowrap;">
                     <a href="{{ url_for('edit_stage', project_id=project.id, stage_id=stage.id) }}" style="font-size:0.875rem;">✏️ Редактировать</a><br>
@@ -241,7 +492,7 @@
     <div class="budget-stats" style="display: flex; gap: 2rem; flex-wrap: wrap;">
         <div class="budget-item tooltip">
             <div class="budget-label" style="font-size: 0.75rem; color: #64748b;">Плановый бюджет</div>
-            <div class="budget-value" style="font-size: 1.5rem; font-weight: bold;">{{ "%.2f"|format(total_planned) }} ₽</div>
+            <div class="budget-value" style="font-size: 1.5rem; font-weight: bold;" id="total-planned">{{ "%.2f"|format(total_planned) }} ₽</div>
             <span class="tooltiptext" style="width: 200px;">
                 🧱 Материалы: {{ "%.0f"|format(total_planned_materials) }} ₽<br>
                 👷 Работа: {{ "%.0f"|format(total_planned_labor) }} ₽
@@ -249,7 +500,7 @@
         </div>
         <div class="budget-item tooltip">
             <div class="budget-label" style="font-size: 0.75rem; color: #64748b;">Фактические затраты</div>
-            <div class="budget-value" style="font-size: 1.5rem; font-weight: bold;">{{ "%.2f"|format(total_actual) }} ₽</div>
+            <div class="budget-value" style="font-size: 1.5rem; font-weight: bold;" id="total-actual">{{ "%.2f"|format(total_actual) }} ₽</div>
             <span class="tooltiptext" style="width: 200px;">
                 ✅ Материалы: {{ "%.0f"|format(total_actual_materials) }} ₽<br>
                 ✅ Работа: {{ "%.0f"|format(total_actual_labor) }} ₽
@@ -258,7 +509,7 @@
         <div class="budget-item">
             <div class="budget-label" style="font-size: 0.75rem; color: #64748b;">Отклонение</div>
             {% set diff = total_actual - total_planned %}
-            <div class="budget-value" style="font-size: 1.5rem; font-weight: bold; color: {% if diff > 0 %}#ef4444{% elif diff < 0 %}#10b981{% else %}#64748b{% endif %};">
+            <div class="budget-value" style="font-size: 1.5rem; font-weight: bold; color: {% if diff > 0 %}#ef4444{% elif diff < 0 %}#10b981{% else %}#64748b{% endif %};" id="budget-diff">
                 {% if diff > 0 %}↑ {{ "%.2f"|format(diff) }} ₽
                 {% elif diff < 0 %}↓ {{ "%.2f"|format(0 - diff) }} ₽
                 {% else %}0 ₽{% endif %}
@@ -266,13 +517,24 @@
         </div>
         <div class="budget-item">
             <div class="budget-label" style="font-size: 0.75rem; color: #64748b;">Процент освоения</div>
-            <div class="budget-value" style="font-size: 1.5rem; font-weight: bold;">
+            <div class="budget-value" style="font-size: 1.5rem; font-weight: bold;" id="budget-usage">
                 {% if total_planned > 0 %}
                     {{ (total_actual / total_planned * 100)|round(1) }}%
                 {% else %}
                     0%
                 {% endif %}
             </div>
+        </div>
+        <div class="budget-item">
+            <div class="budget-label" style="font-size: 0.75rem; color: #64748b;">Общий прогресс</div>
+            {% set total_stages = stages|length %}
+            {% set completed_stages = stages|selectattr('percent_complete', 'ge', 100)|list|length %}
+            {% set overall_progress = (completed_stages / total_stages * 100)|round(1) if total_stages > 0 else 0 %}
+            <div class="budget-value" style="font-size: 1.5rem; font-weight: bold; color: #3b82f6;" id="overall-progress">{{ overall_progress }}%</div>
+            <div class="progress-container" style="margin-top: 0.5rem;">
+                <div class="progress-bar" style="width: {{ overall_progress }}%; background: #3b82f6;" id="progress-bar"></div>
+            </div>
+            <div style="font-size: 0.7rem; color: #64748b; margin-top: 0.25rem;">Выполнено {{ completed_stages }}/{{ total_stages }} этапов</div>
         </div>
     </div>
 </div>
@@ -295,6 +557,95 @@
     <a href="{{ url_for('contracts', project_id=project.id) }}" class="card" style="display:inline-block; padding:0.75rem 1.5rem; text-decoration:none; background:#f1f5f9; border-radius:8px;">📝 Договоры</a>
     <a href="{{ url_for('s_curve', project_id=project.id) }}" class="card" style="display:inline-block; padding:0.75rem 1.5rem; text-decoration:none; background:#f1f5f9; border-radius:8px;">📊 Аналитика</a>
 </div>
+
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        let scrollPosition = 0;
+        
+        document.querySelectorAll('.update-percent-btn').forEach(button => {
+            button.addEventListener('click', function() {
+                const stageId = this.dataset.stageId;
+                const input = document.getElementById(`percent-${stageId}`);
+                const percent = input.value;
+                
+                scrollPosition = window.scrollY;
+                
+                fetch(`/update_completion_ajax/{{ project.id }}`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ stage_id: stageId, percent: percent })
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        const displayDiv = document.querySelector(`.percent-display-${stageId}`);
+                        if (displayDiv) displayDiv.textContent = `${percent}%`;
+                        updateOverallProgress();
+                        updateBudget();
+                        window.scrollTo(0, scrollPosition);
+                    } else {
+                        alert('Ошибка: ' + data.error);
+                    }
+                })
+                .catch(error => {
+                    console.error('Error:', error);
+                    alert('Ошибка при обновлении');
+                });
+            });
+        });
+        
+        function updateOverallProgress() {
+            fetch(`/get_project_progress/{{ project.id }}`)
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        const overallElement = document.getElementById('overall-progress');
+                        const progressBar = document.getElementById('progress-bar');
+                        if (overallElement) overallElement.textContent = data.overall_progress + '%';
+                        if (progressBar) progressBar.style.width = data.overall_progress + '%';
+                    }
+                });
+        }
+        
+        function updateBudget() {
+            fetch(`/get_project_budget/{{ project.id }}`)
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        const plannedElement = document.getElementById('total-planned');
+                        const actualElement = document.getElementById('total-actual');
+                        const diffElement = document.getElementById('budget-diff');
+                        const usageElement = document.getElementById('budget-usage');
+                        
+                        if (plannedElement) plannedElement.textContent = data.total_planned.toLocaleString() + ' ₽';
+                        if (actualElement) actualElement.textContent = data.total_actual.toLocaleString() + ' ₽';
+                        
+                        if (diffElement) {
+                            const diff = data.total_actual - data.total_planned;
+                            const diffColor = diff > 0 ? '#ef4444' : (diff < 0 ? '#10b981' : '#64748b');
+                            const diffSymbol = diff > 0 ? '↑' : (diff < 0 ? '↓' : '');
+                            diffElement.textContent = `${diffSymbol} ${Math.abs(diff).toLocaleString()} ₽`;
+                            diffElement.style.color = diffColor;
+                        }
+                        
+                        if (usageElement && data.total_planned > 0) {
+                            const usage = (data.total_actual / data.total_planned * 100).toFixed(1);
+                            usageElement.textContent = usage + '%';
+                        }
+                    }
+                });
+        }
+        
+        document.querySelectorAll('.percent-input').forEach(input => {
+            input.addEventListener('keypress', function(e) {
+                if (e.key === 'Enter') {
+                    const button = document.querySelector(`.update-percent-btn[data-stage-id="${this.dataset.stageId}"]`);
+                    if (button) button.click();
+                }
+            });
+        });
+    });
+</script>
 
 <style>
     .card {
@@ -325,6 +676,26 @@
         border-radius: 12px;
         padding: 1.25rem;
         margin: 1rem 0;
+    }
+    .budget-stats {
+        display: flex;
+        gap: 2rem;
+        flex-wrap: wrap;
+    }
+    .budget-item {
+        flex: 1;
+        min-width: 150px;
+    }
+    .budget-label {
+        font-size: 0.75rem;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        color: #64748b;
+    }
+    .budget-value {
+        font-size: 1.5rem;
+        font-weight: 700;
+        color: #0f172a;
     }
 </style>
 
