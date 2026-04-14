@@ -13,6 +13,8 @@ from docx import Document
 from docx.shared import Inches, Pt
 from docx.enum.text import WD_ALIGN_PARAGRAPH
 from flask_login import LoginManager, login_user, logout_user, login_required, current_user
+import json
+import re
 
 app = Flask(__name__)
 app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///construction.db'
@@ -22,6 +24,18 @@ db.init_app(app)
 
 # API ключ для OpenWeatherMap
 WEATHER_API_KEY = "45e15fb41b97d5a968cae6fdc72e88c5"
+
+# Настройка DeepSeek API
+DEEPSEEK_API_KEY = "sk-806b7e601d5348668394d298b28f3bfd"
+DEEPSEEK_API_URL = "https://api.deepseek.com/v1"
+
+# Настройка OpenAI (совместимость с DeepSeek)
+import openai
+openai.api_key = DEEPSEEK_API_KEY
+openai.api_base = DEEPSEEK_API_URL
+
+# Хранилище сгенерированных этапов для сессии
+generated_stages_cache = {}
 
 login_manager = LoginManager()
 login_manager.init_app(app)
@@ -283,6 +297,125 @@ def get_materials_for_stage(stage_name, budget):
         })
     
     return materials
+
+# Генерация этапов на основе бюджета
+def generate_stages_by_budget(budget, project_type, quality):
+    """Генерация этапов на основе бюджета"""
+    
+    # Коэффициенты качества
+    quality_mult = {
+        'econom': 0.7,
+        'standard': 1.0,
+        'premium': 1.5
+    }
+    mult = quality_mult.get(quality, 1.0)
+    
+    # Распределение бюджета по этапам (в процентах)
+    if project_type == 'house':
+        stage_percents = [
+            ('Геодезические работы', 1, None, 'Геодезист', 1),
+            ('Подготовка участка', 2, 'Геодезические работы', 'Бригада 1', 2),
+            ('Земляные работы (котлован)', 4, 'Подготовка участка', 'Бригада 1', 4),
+            ('Устройство подушки и опалубки', 3, 'Земляные работы (котлован)', 'Бригада 1', 3),
+            ('Армирование и заливка фундамента', 6, 'Устройство подушки и опалубки', 'Бригада 1', 10),
+            ('Гидроизоляция фундамента', 2, 'Армирование и заливка фундамента', 'Бригада 1', 2),
+            ('Возведение стен', 10, 'Гидроизоляция фундамента', 'Бригада 2', 15),
+            ('Монтаж перекрытий', 4, 'Возведение стен', 'Бригада 2', 5),
+            ('Кровля', 7, 'Монтаж перекрытий', 'Бригада 3', 10),
+            ('Установка окон и дверей', 4, 'Возведение стен', 'Бригада 4', 5),
+            ('Фасадные работы', 8, 'Установка окон и дверей', 'Бригада 5', 8),
+            ('Электромонтаж', 6, 'Возведение стен', 'Бригада 6', 5),
+            ('Сантехника и отопление', 6, 'Возведение стен', 'Бригада 7', 6),
+            ('Штукатурка', 7, 'Электромонтаж, Сантехника и отопление', 'Бригада 8', 6),
+            ('Стяжка полов', 4, 'Штукатурка', 'Бригада 8', 3),
+            ('Чистовая отделка', 12, 'Стяжка полов', 'Бригада 9', 10),
+            ('Благоустройство', 6, 'Фасадные работы', 'Бригада 10', 4),
+            ('Итоговая уборка', 2, 'Чистовая отделка, Благоустройство', 'Бригада 11', 1)
+        ]
+    elif project_type == 'apartment':
+        stage_percents = [
+            ('Демонтажные работы', 3, None, 'Бригада 1', 4),
+            ('Электромонтаж (черновой)', 4, 'Демонтажные работы', 'Бригада 2', 5),
+            ('Сантехника (черновая)', 4, 'Демонтажные работы', 'Бригада 3', 5),
+            ('Штукатурка стен', 6, 'Электромонтаж (черновой), Сантехника (черновая)', 'Бригада 4', 8),
+            ('Стяжка полов', 4, 'Штукатурка стен', 'Бригада 4', 5),
+            ('Чистовая отделка', 10, 'Стяжка полов', 'Бригада 5', 25),
+            ('Укладка напольных покрытий', 5, 'Стяжка полов', 'Бригада 5', 12),
+            ('Установка дверей', 3, 'Чистовая отделка', 'Бригада 6', 5),
+            ('Электромонтаж (чистовой)', 3, 'Чистовая отделка', 'Бригада 2', 4),
+            ('Сантехника (чистовая)', 3, 'Чистовая отделка', 'Бригада 3', 4),
+            ('Монтаж кухни', 4, 'Чистовая отделка', 'Бригада 7', 8),
+            ('Уборка', 2, 'Монтаж кухни', 'Бригада 8', 2)
+        ]
+    else:  # commercial
+        stage_percents = [
+            ('Подготовка площадки', 4, None, 'Бригада 1', 5),
+            ('Земляные работы', 6, 'Подготовка площадки', 'Бригада 1', 6),
+            ('Фундамент', 8, 'Земляные работы', 'Бригада 1', 12),
+            ('Каркас здания', 14, 'Фундамент', 'Бригада 2', 20),
+            ('Кровля', 7, 'Каркас здания', 'Бригада 3', 8),
+            ('Фасад', 10, 'Каркас здания', 'Бригада 4', 10),
+            ('Инженерные системы', 12, 'Каркас здания', 'Бригада 5', 15),
+            ('Внутренняя отделка', 15, 'Инженерные системы', 'Бригада 6', 15),
+            ('Благоустройство', 8, 'Фасад', 'Бригада 7', 6),
+            ('Сдача объекта', 3, 'Внутренняя отделка, Благоустройство', 'Бригада 8', 3)
+        ]
+    
+    stages = []
+    remaining_budget = budget
+    
+    for name, duration, depends_on, resources, percent in stage_percents:
+        stage_budget = budget * (percent / 100) * mult
+        if stage_budget > remaining_budget:
+            stage_budget = remaining_budget * 0.8
+        
+        stages.append({
+            'name': name,
+            'duration': duration,
+            'depends_on': depends_on,
+            'resources': resources,
+            'budget': round(stage_budget, 0),
+            'percent': percent
+        })
+    
+    # Нормализуем бюджет (чтобы сумма не превышала исходный бюджет)
+    total = sum(s['budget'] for s in stages)
+    if total > budget:
+        ratio = budget / total
+        for stage in stages:
+            stage['budget'] = round(stage['budget'] * ratio, 0)
+    
+    return stages
+
+def generate_stages_from_ai(message, project):
+    """Генерация этапов на основе запроса через DeepSeek"""
+    prompt = f"""На основе запроса: "{message}"
+Составь JSON-массив этапов для проекта "{project.name}".
+Каждый этап должен содержать:
+- name: название этапа
+- duration: длительность в днях (число)
+- depends_on: название этапа, от которого зависит (или null)
+- resources: название бригады
+
+Верни только JSON, без пояснений.
+Пример: [{{"name": "Фундамент", "duration": 7, "depends_on": null, "resources": "Бригада 1"}}]"""
+    
+    try:
+        response = openai.ChatCompletion.create(
+            model="deepseek-chat",
+            messages=[{"role": "user", "content": prompt}],
+            temperature=0.7,
+            max_tokens=2000
+        )
+        
+        text = response.choices[0].message.content
+        json_match = re.search(r'\[.*\]', text, re.DOTALL)
+        if json_match:
+            return json.loads(json_match.group())
+        return []
+    except Exception as e:
+        print(f"Ошибка генерации этапов: {e}")
+        return []
 
 @app.route('/register', methods=['GET', 'POST'])
 def register():
@@ -558,6 +691,184 @@ def executive_dashboard():
                          overdue_stages=overdue_stages,
                          overall_progress=overall_progress,
                          budget_usage=budget_usage)
+
+@app.route('/api/ai/chat', methods=['POST'])
+@login_required
+def ai_chat():
+    data = request.get_json()
+    message = data.get('message', '')
+    project_id = data.get('project_id')
+    
+    project = Project.query.get(project_id)
+    
+    # Формируем контекст проекта
+    context = f"Проект: {project.name}\nДата начала: {project.start_date}\n"
+    stages = Stage.query.filter_by(project_id=project_id).all()
+    if stages:
+        context += f"Всего этапов: {len(stages)}\n"
+        completed = len([s for s in stages if s.percent_complete >= 100])
+        context += f"Выполнено этапов: {completed}\n"
+    
+    prompt = f"""Ты профессиональный строительный консультант. 
+Контекст проекта:
+{context}
+
+Вопрос пользователя: {message}
+
+Ответь полезно и конкретно. Если просят смету, предложи структуру этапов.
+Если вопрос не по строительству, вежливо скажи, что ты строительный ассистент."""
+    
+    try:
+        response = openai.ChatCompletion.create(
+            model="deepseek-chat",
+            messages=[
+                {"role": "system", "content": "Ты профессиональный строительный консультант. Отвечай кратко и по делу."},
+                {"role": "user", "content": prompt}
+            ],
+            temperature=0.7,
+            max_tokens=1000
+        )
+        
+        answer = response.choices[0].message.content
+        
+        # Проверяем, не просит ли пользователь смету
+        stages = []
+        if 'смет' in message.lower() or 'этап' in message.lower():
+            stages = generate_stages_from_ai(message, project)
+            generated_stages_cache[project_id] = stages
+        
+        return json.jsonify({
+            'success': True,
+            'response': answer,
+            'stages': stages
+        })
+        
+    except Exception as e:
+        print(f"Ошибка DeepSeek: {e}")
+        return json.jsonify({'success': False, 'error': str(e)})
+
+@app.route('/api/ai/add_stages/<int:project_id>', methods=['POST'])
+@login_required
+def add_ai_stages(project_id):
+    project = Project.query.get_or_404(project_id)
+    if project.user_id != current_user.id:
+        return json.jsonify({'success': False, 'error': 'Access denied'})
+    
+    stages_data = generated_stages_cache.get(project_id, [])
+    if not stages_data:
+        return json.jsonify({'success': False, 'error': 'No generated stages'})
+    
+    added = 0
+    stage_names = {s.name: s.id for s in Stage.query.filter_by(project_id=project_id).all()}
+    
+    for stage_data in stages_data:
+        name = stage_data.get('name')
+        if name in stage_names:
+            continue
+        
+        stage = Stage(
+            name=name,
+            planned_duration=stage_data.get('duration', 7),
+            project_id=project_id,
+            percent_complete=0
+        )
+        db.session.add(stage)
+        db.session.flush()
+        stage_names[name] = stage.id
+        added += 1
+        
+        # Добавляем ресурс
+        if stage_data.get('resources'):
+            resource = Resource.query.filter_by(name=stage_data['resources']).first()
+            if not resource:
+                resource = Resource(name=stage_data['resources'])
+                db.session.add(resource)
+                db.session.flush()
+            assign = Assignment(stage_id=stage.id, resource_id=resource.id)
+            db.session.add(assign)
+        
+        # Добавляем зависимость
+        depends_on = stage_data.get('depends_on')
+        if depends_on and depends_on in stage_names:
+            dep = Dependency(stage_id=stage.id, depends_on_stage_id=stage_names[depends_on])
+            db.session.add(dep)
+    
+    db.session.commit()
+    generated_stages_cache[project_id] = []
+    
+    return json.jsonify({'success': True, 'count': added})
+
+@app.route('/api/generate_estimate_by_budget', methods=['POST'])
+@login_required
+def generate_estimate_by_budget():
+    data = request.get_json()
+    budget = data.get('budget')
+    project_type = data.get('type', 'house')
+    quality = data.get('quality', 'standard')
+    project_id = data.get('project_id')
+    
+    if not budget or budget < 50000:
+        return json.jsonify({'success': False, 'error': 'Бюджет должен быть не менее 50 000 ₽'})
+    
+    # Генерация этапов на основе бюджета
+    stages = generate_stages_by_budget(budget, project_type, quality)
+    
+    return json.jsonify({'success': True, 'stages': stages})
+
+@app.route('/api/add_estimate_stages/<int:project_id>', methods=['POST'])
+@login_required
+def add_estimate_stages(project_id):
+    project = Project.query.get_or_404(project_id)
+    if project.user_id != current_user.id:
+        return json.jsonify({'success': False, 'error': 'Access denied'})
+    
+    data = request.get_json()
+    stages_data = data.get('stages', [])
+    
+    added = 0
+    existing_stages = {s.name: s.id for s in Stage.query.filter_by(project_id=project_id).all()}
+    
+    for stage_data in stages_data:
+        name = stage_data.get('name')
+        if name in existing_stages:
+            continue
+        
+        duration = stage_data.get('duration', 7)
+        
+        stage = Stage(
+            name=name,
+            planned_duration=duration,
+            project_id=project_id,
+            planned_material_cost=round(stage_data.get('budget', 0) * 0.6, 0),
+            planned_labor_cost=round(stage_data.get('budget', 0) * 0.4, 0),
+            percent_complete=0
+        )
+        db.session.add(stage)
+        db.session.flush()
+        existing_stages[name] = stage.id
+        added += 1
+        
+        # Добавляем ресурсы
+        resources = stage_data.get('resources', '')
+        if resources and resources != '—':
+            for r_name in resources.split(', '):
+                resource = Resource.query.filter_by(name=r_name).first()
+                if not resource:
+                    resource = Resource(name=r_name)
+                    db.session.add(resource)
+                    db.session.flush()
+                assign = Assignment(stage_id=stage.id, resource_id=resource.id)
+                db.session.add(assign)
+        
+        # Добавляем зависимости
+        depends_on = stage_data.get('depends_on')
+        if depends_on and depends_on != '—' and depends_on in existing_stages:
+            dep = Dependency(stage_id=stage.id, depends_on_stage_id=existing_stages[depends_on])
+            db.session.add(dep)
+    
+    db.session.commit()
+    
+    return json.jsonify({'success': True, 'count': added})
 
 @app.route('/s_curve/<int:project_id>')
 @login_required
