@@ -1,33 +1,55 @@
 {% extends "base.html" %}
 {% block content %}
-<h1>📸 Фотоотчёты</h1>
-<p style="color:#64748b; margin-bottom:1.5rem;">Проект: {{ project.name }}</p>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
 
+<h1 style="font-size: 2rem; font-weight: 600; margin-bottom: 0.5rem;"><i class="fas fa-camera-retro" style="margin-right: 12px; color: #2563eb;"></i>Фотоотчёты — {{ project.name }}</h1>
+<p style="color: #64748b; margin-bottom: 2rem;">Загружайте фотографии с привязкой к этапам</p>
+
+<!-- Форма загрузки -->
+<div style="background: white; border-radius: 20px; padding: 1.5rem; margin-bottom: 2rem; box-shadow: 0 4px 12px rgba(0,0,0,0.02);">
+    <h3 style="margin-bottom: 1rem;">Загрузить новое фото</h3>
+    <form method="POST" action="{{ url_for('upload_photo', project_id=project.id) }}" enctype="multipart/form-data" style="display: grid; gap: 1rem;">
+        <div>
+            <label style="display: block; margin-bottom: 6px; font-weight: 500;">Выберите этап *</label>
+            <select name="stage_name" required style="width: 100%; padding: 12px; border: 1px solid #e2e8f0; border-radius: 12px;">
+                <option value="">-- Выберите этап --</option>
+                {% for stage in project.stages %}
+                <option value="{{ stage.name }}">{{ stage.name }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div>
+            <label style="display: block; margin-bottom: 6px; font-weight: 500;">Описание (необязательно)</label>
+            <input type="text" name="caption" placeholder="Что изображено?" style="width: 100%; padding: 12px; border: 1px solid #e2e8f0; border-radius: 12px;">
+        </div>
+        <div>
+            <label style="display: block; margin-bottom: 6px; font-weight: 500;">Файл изображения *</label>
+            <input type="file" name="photo" accept="image/*" required style="width: 100%; padding: 12px; border: 1px solid #e2e8f0; border-radius: 12px;">
+        </div>
+        <div>
+            <button type="submit" style="background: #2563eb; color: white; border: none; padding: 12px 24px; border-radius: 12px; font-weight: 500;"><i class="fas fa-upload"></i> Загрузить</button>
+        </div>
+    </form>
+</div>
+
+<!-- Галерея -->
 {% if photos %}
-<div class="photo-grid">
+<div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 1.5rem;">
     {% for photo in photos %}
-    <div class="photo-card">
-        <img src="{{ url_for('static', filename=photo.filepath) }}" alt="{{ photo.stage_name }}">
-        <div class="photo-info">
-            <div class="photo-stage">🏗️ {{ photo.stage_name }}</div>
-            <div class="photo-caption">📝 {{ photo.caption or 'Без подписи' }}</div>
-            <div class="photo-meta">👤 {{ photo.telegram_user }} • {{ photo.created_at.strftime('%d.%m.%Y %H:%M') }}</div>
+    <div style="background: white; border-radius: 20px; overflow: hidden; box-shadow: 0 4px 12px rgba(0,0,0,0.02);">
+        <img src="{{ url_for('static', filename=photo.filepath) }}" style="width: 100%; height: 200px; object-fit: cover;">
+        <div style="padding: 1rem;">
+            <p style="font-weight: 500;">{{ photo.stage_name }}</p>
+            <p style="color: #64748b; font-size: 0.85rem;">{{ photo.caption or '' }}</p>
+            <p style="color: #94a3b8; font-size: 0.75rem; margin-top: 8px;">{{ photo.created_at.strftime('%d.%m.%Y %H:%M') }}</p>
         </div>
     </div>
     {% endfor %}
 </div>
 {% else %}
-<div class="card" style="text-align:center;">
-    <p style="font-size:3rem; margin-bottom:0.5rem;">📭</p>
-    <p>Нет фотоотчётов</p>
-    <p style="font-size:0.875rem; color:#64748b; margin-top:0.5rem;">
-        Отправьте фото через Telegram-бота:<br>
-        /projects → /select [номер] → фото с подписью "Этап: описание"
-    </p>
+<div style="background: white; border-radius: 20px; padding: 3rem; text-align: center; color: #64748b;">
+    <i class="fas fa-images" style="font-size: 3rem; margin-bottom: 1rem;"></i>
+    <p>Нет загруженных фотографий.</p>
 </div>
 {% endif %}
-
-<p style="margin-top:1.5rem;">
-    <a href="{{ url_for('project_view', project_id=project.id) }}">← Вернуться к проекту</a>
-</p>
 {% endblock %}

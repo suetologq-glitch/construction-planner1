@@ -1,0 +1,15 @@
+{% extends "base.html" %}
+{% block content %}
+<h1 style="font-size: 2rem; font-weight: 600; margin-bottom: 2rem;">Шаблоны проектов</h1>
+
+<div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 1.5rem;">
+    {% for t in templates %}
+    <div style="background: white; border-radius: 20px; padding: 1.5rem;">
+        <h3 style="margin-bottom: 8px;">{{ t.name }}</h3>
+        <p style="color: #64748b; margin-bottom: 16px;">{{ t.description or 'Без описания' }}</p>
+        <p style="font-size: 0.85rem;">Создан {{ t.created_at.strftime('%d.%m.%Y') }}</p>
+        <a href="{{ url_for('delete_template', template_id=t.id) }}" onclick="return confirm('Удалить?')" style="color: #ef4444; margin-top: 12px; display: inline-block;">Удалить</a>
+    </div>
+    {% endfor %}
+</div>
+{% endblock %}

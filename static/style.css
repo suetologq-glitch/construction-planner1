@@ -343,3 +343,52 @@ a:hover {
         gap: 0.75rem;
     }
 }
+
+.budget-tooltip {
+    position: relative;
+    display: inline-block;
+}
+.budget-tooltip .tooltip-content {
+    visibility: hidden;
+    background: #1e293b;
+    color: white;
+    text-align: left;
+    padding: 8px 12px;
+    border-radius: 8px;
+    position: absolute;
+    z-index: 10;
+    bottom: 125%;
+    left: 50%;
+    transform: translateX(-50%);
+    white-space: nowrap;
+    font-size: 0.8rem;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+}
+.budget-tooltip:hover .tooltip-content {
+    visibility: visible;
+}
+
+.budget-tooltip {
+    position: relative;
+    display: inline-block;
+}
+.budget-tooltip .tooltip-content {
+    visibility: hidden;
+    background: #1e293b;
+    color: white;
+    text-align: left;
+    padding: 8px 12px;
+    border-radius: 8px;
+    position: absolute;
+    z-index: 10;
+    bottom: 125%;
+    left: 50%;
+    transform: translateX(-50%);
+    white-space: nowrap;
+    font-size: 0.8rem;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+    pointer-events: none;
+}
+.budget-tooltip:hover .tooltip-content {
+    visibility: visible;
+}

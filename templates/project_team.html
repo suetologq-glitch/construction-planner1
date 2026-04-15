@@ -1,0 +1,31 @@
+{% extends "base.html" %}
+{% block content %}
+<h1 style="font-size: 2rem; font-weight: 600; margin-bottom: 1rem;">Команда: {{ project.name }}</h1>
+
+<div style="display: grid; grid-template-columns: 1fr 2fr; gap: 2rem;">
+    <div style="background: white; border-radius: 20px; padding: 1.5rem;">
+        <h3 style="margin-bottom: 1rem;">Добавить участника</h3>
+        <form method="POST">
+            <input type="email" name="email" placeholder="Email пользователя" required style="width: 100%; padding: 14px; border: 1px solid #e2e8f0; border-radius: 12px; margin-bottom: 1rem;">
+            <select name="role" style="width: 100%; padding: 14px; border: 1px solid #e2e8f0; border-radius: 12px; margin-bottom: 1rem;">
+                <option value="manager">Руководитель</option>
+                <option value="foreman">Прораб</option>
+                <option value="supplier">Снабженец</option>
+                <option value="viewer">Наблюдатель</option>
+            </select>
+            <button type="submit" style="background: #2563eb; color: white; border: none; padding: 14px; border-radius: 12px; width: 100%;">Добавить</button>
+        </form>
+    </div>
+    <div style="background: white; border-radius: 20px; padding: 1.5rem;">
+        <h3 style="margin-bottom: 1rem;">Текущий состав</h3>
+        <ul style="list-style: none;">
+            {% for m in team %}
+            <li style="display: flex; justify-content: space-between; padding: 12px 0; border-bottom: 1px solid #f1f5f9;">
+                <span>{{ m.user.username }} ({{ m.user.email }})</span>
+                <span style="background: #e2e8f0; padding: 4px 12px; border-radius: 30px;">{{ m.role }}</span>
+            </li>
+            {% endfor %}
+        </ul>
+    </div>
+</div>
+{% endblock %}

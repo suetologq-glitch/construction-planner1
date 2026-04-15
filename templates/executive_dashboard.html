@@ -1,134 +1,206 @@
 {% extends "base.html" %}
 {% block content %}
-<h1>👔 Дашборд руководителя</h1>
-<p style="color:#64748b; margin-bottom:1.5rem;">Сводка по всем проектам и ключевые метрики в реальном времени</p>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
-<!-- Общие метрики -->
-<div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem; margin-bottom: 2rem;">
-    <div class="card" style="text-align: center;">
-        <div style="font-size: 2rem; font-weight: bold; color: #3b82f6;">{{ total_projects }}</div>
-        <div style="color: #64748b;">Активных проектов</div>
+<h1 style="font-size: 2rem; font-weight: 600; margin-bottom: 0.5rem;"><i class="fas fa-chart-pie" style="margin-right: 12px; color: #2563eb;"></i>Аналитика и статистика</h1>
+<p style="color: #64748b; margin-bottom: 2rem;">Сводка по всем проектам</p>
+
+<!-- Ключевые показатели -->
+<div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 1.5rem; margin-bottom: 2rem;">
+    <div style="background: white; border-radius: 20px; padding: 1.5rem; box-shadow: 0 4px 12px rgba(0,0,0,0.02);">
+        <div style="color: #64748b; font-size: 0.9rem; margin-bottom: 8px;"><i class="fas fa-hard-hat"></i> Всего проектов</div>
+        <div style="font-size: 2.5rem; font-weight: 700; color: #0f172a;">{{ total_projects }}</div>
     </div>
-    <div class="card" style="text-align: center;">
-        <div style="font-size: 2rem; font-weight: bold; color: #10b981;">{{ "{:,.0f}".format(total_budget).replace(',', ' ') }} ₽</div>
-        <div style="color: #64748b;">Общий бюджет</div>
+    <div style="background: white; border-radius: 20px; padding: 1.5rem; box-shadow: 0 4px 12px rgba(0,0,0,0.02);">
+        <div style="color: #64748b; font-size: 0.9rem; margin-bottom: 8px;"><i class="fas fa-ruble-sign"></i> Общий бюджет</div>
+        <div style="font-size: 2rem; font-weight: 700; color: #0f172a;">{{ "{:,.0f}".format(total_budget).replace(',', ' ') }} ₽</div>
     </div>
-    <div class="card" style="text-align: center;">
-        <div style="font-size: 2rem; font-weight: bold; color: #f59e0b;">{{ "{:,.0f}".format(total_spent).replace(',', ' ') }} ₽</div>
-        <div style="color: #64748b;">Фактические затраты</div>
+    <div style="background: white; border-radius: 20px; padding: 1.5rem; box-shadow: 0 4px 12px rgba(0,0,0,0.02);">
+        <div style="color: #64748b; font-size: 0.9rem; margin-bottom: 8px;"><i class="fas fa-tasks"></i> Всего этапов</div>
+        <div style="font-size: 2.5rem; font-weight: 700; color: #0f172a;">{{ total_stages }}</div>
     </div>
-    <div class="card" style="text-align: center;">
-        <div style="font-size: 2rem; font-weight: bold; color: #ef4444;">{{ overdue_stages }}</div>
-        <div style="color: #64748b;">Просроченных этапов</div>
+    <div style="background: white; border-radius: 20px; padding: 1.5rem; box-shadow: 0 4px 12px rgba(0,0,0,0.02);">
+        <div style="color: #64748b; font-size: 0.9rem; margin-bottom: 8px;"><i class="fas fa-check-circle"></i> Общий прогресс</div>
+        <div style="font-size: 2rem; font-weight: 700; color: #0f172a;">{{ overall_progress }}%</div>
+        <div style="background: #e2e8f0; height: 6px; border-radius: 3px; margin-top: 12px;">
+            <div style="background: #10b981; height: 6px; border-radius: 3px; width: {{ overall_progress }}%;"></div>
+        </div>
     </div>
 </div>
 
-<div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 1rem; margin-bottom: 2rem;">
-    <div class="card">
-        <h3 style="margin-top:0;">📈 Общий прогресс</h3>
-        <div style="font-size: 3rem; font-weight: bold; color: #3b82f6;">{{ overall_progress }}%</div>
-        <div class="progress-container" style="margin-top: 0.5rem;">
-            <div class="progress-bar" style="width: {{ overall_progress }}%;"></div>
-        </div>
-        <p style="margin-top: 0.5rem; color:#64748b;">Выполнено {{ completed_stages }}/{{ total_stages }} этапов</p>
+<!-- Графики -->
+<div style="display: grid; grid-template-columns: 1.5fr 1fr; gap: 2rem; margin-bottom: 2rem;">
+    <div style="background: white; border-radius: 20px; padding: 1.5rem; box-shadow: 0 4px 12px rgba(0,0,0,0.02);">
+        <h3 style="margin-bottom: 1rem; font-weight: 600;"><i class="fas fa-chart-bar"></i> Прогресс по проектам</h3>
+        <canvas id="progressChart" style="max-height: 280px;"></canvas>
     </div>
-    <div class="card">
-        <h3 style="margin-top:0;">💰 Освоение бюджета</h3>
-        <div style="font-size: 3rem; font-weight: bold; color: {% if budget_usage > 100 %}#ef4444{% else %}#10b981{% endif %};">
-            {{ budget_usage }}%
-        </div>
-        <div class="progress-container" style="margin-top: 0.5rem;">
-            <div class="progress-bar" style="width: {{ budget_usage }}%; background: {% if budget_usage > 100 %}#ef4444{% else %}#10b981{% endif %};"></div>
-        </div>
-        <p style="margin-top: 0.5rem; color:#64748b;">Потрачено {{ "{:,.0f}".format(total_spent).replace(',', ' ') }} ₽ из {{ "{:,.0f}".format(total_budget).replace(',', ' ') }} ₽</p>
+    <div style="background: white; border-radius: 20px; padding: 1.5rem; box-shadow: 0 4px 12px rgba(0,0,0,0.02);">
+        <h3 style="margin-bottom: 1rem; font-weight: 600;"><i class="fas fa-chart-pie"></i> Доля бюджета по проектам</h3>
+        <canvas id="budgetPieChart" style="max-height: 280px;"></canvas>
     </div>
 </div>
 
-<!-- Таблица проектов -->
-<h2>📋 Детализация по проектам</h2>
-<div style="overflow-x: auto;">
-    <table style="width:100%; border-collapse: collapse;">
+<!-- Сводка по проектам -->
+<div style="background: white; border-radius: 20px; padding: 1.5rem; margin-bottom: 2rem; box-shadow: 0 4px 12px rgba(0,0,0,0.02); overflow-x: auto;">
+    <h3 style="margin-bottom: 1.5rem; font-weight: 600;"><i class="fas fa-table"></i> Сводка по проектам</h3>
+    <table style="width: 100%; border-collapse: collapse; min-width: 1000px;">
         <thead>
-            <tr style="background:#f1f5f9;">
-                <th style="padding: 12px; border: 1px solid #e2e8f0;">Проект</th>
-                <th style="padding: 12px; border: 1px solid #e2e8f0;">Прогресс</th>
-                <th style="padding: 12px; border: 1px solid #e2e8f0;">Бюджет</th>
-                <th style="padding: 12px; border: 1px solid #e2e8f0;">Освоено</th>
-                <th style="padding: 12px; border: 1px solid #e2e8f0;">Этапы</th>
-                <th style="padding: 12px; border: 1px solid #e2e8f0;">Просрочено</th>
-                <th style="padding: 12px; border: 1px solid #e2e8f0;">План сдачи</th>
-                <th style="padding: 12px; border: 1px solid #e2e8f0;">Действия</th>
-              </tr>
+            <tr style="border-bottom: 1px solid #e2e8f0;">
+                <th style="padding: 1rem; text-align: left;">Проект</th>
+                <th style="padding: 1rem; text-align: left;">Бюджет</th>
+                <th style="padding: 1rem; text-align: left;">Этапов</th>
+                <th style="padding: 1rem; text-align: left;">Завершено</th>
+                <th style="padding: 1rem; text-align: left;">Просрочено</th>
+                <th style="padding: 1rem; text-align: left;">Прогресс</th>
+                <th style="padding: 1rem; text-align: left;">План. завершение</th>
+            </tr>
         </thead>
         <tbody>
-            {% for stat in project_stats %}
-            <tr style="border-bottom: 1px solid #e2e8f0;">
-                <td style="padding: 10px; border: 1px solid #e2e8f0;"><strong>{{ stat.project.name }}</strong></td>
-                <td style="padding: 10px; border: 1px solid #e2e8f0;">
-                    <div style="display: flex; align-items: center; gap: 0.5rem;">
-                        <div class="progress-container" style="flex:1; margin:0;">
-                            <div class="progress-bar" style="width: {{ stat.progress }}%;"></div>
+            {% for s in project_stats %}
+            <tr style="border-bottom: 1px solid #f1f5f9;">
+                <td style="padding: 1rem; font-weight: 500;">{{ s.project.name }}</td>
+                <td style="padding: 1rem;">{{ "{:,.0f}".format(s.budget).replace(',', ' ') }} ₽</td>
+                <td style="padding: 1rem;">{{ s.total_stages }}</td>
+                <td style="padding: 1rem;">{{ s.completed_stages }}</td>
+                <td style="padding: 1rem; color: {% if s.overdue > 0 %}#ef4444{% else %}#64748b{% endif %};">{{ s.overdue }}</td>
+                <td style="padding: 1rem;">
+                    <div style="display: flex; align-items: center; gap: 8px;">
+                        <span>{{ s.progress }}%</span>
+                        <div style="background: #e2e8f0; height: 6px; width: 80px; border-radius: 3px;">
+                            <div style="background: #2563eb; height: 6px; border-radius: 3px; width: {{ s.progress }}%;"></div>
                         </div>
-                        <span>{{ stat.progress }}%</span>
                     </div>
                 </td>
-                <td style="padding: 10px; border: 1px solid #e2e8f0;">{{ "{:,.0f}".format(stat.budget).replace(',', ' ') }} ₽</td>
-                <td style="padding: 10px; border: 1px solid #e2e8f0;">
-                    {{ "{:,.0f}".format(stat.spent).replace(',', ' ') }} ₽
-                    <span style="color: {% if stat.budget_usage > 100 %}#ef4444{% elif stat.budget_usage > 80 %}#f59e0b{% else %}#10b981{% endif %};">
-                        ({{ stat.budget_usage }}%)
-                    </span>
-                </td>
-                <td style="padding: 10px; border: 1px solid #e2e8f0;">{{ stat.completed_stages }}/{{ stat.total_stages }}</td>
-                <td style="padding: 10px; border: 1px solid #e2e8f0; color: {% if stat.overdue > 0 %}#ef4444{% else %}#10b981{% endif %};">
-                    {% if stat.overdue > 0 %}
-                        ⚠️ {{ stat.overdue }}
-                    {% else %}
-                        ✅ 0
-                    {% endif %}
-                </td>
-                <td style="padding: 10px; border: 1px solid #e2e8f0;">
-                    {% if stat.completion_date %}
-                        {{ stat.completion_date.strftime('%d.%m.%Y') }}
-                    {% else %}
-                        —
-                    {% endif %}
-                </td>
-                <td style="padding: 10px; border: 1px solid #e2e8f0;">
-                    <a href="{{ url_for('project_view', project_id=stat.project.id) }}" style="color:#3b82f6;">Открыть</a>
-                    <a href="{{ url_for('s_curve', project_id=stat.project.id) }}" style="color:#f59e0b; margin-left:10px;">📊 Аналитика</a>
-                </td>
+                <td style="padding: 1rem;">{{ s.completion_date.strftime('%d.%m.%Y') if s.completion_date else '—' }}</td>
             </tr>
             {% endfor %}
         </tbody>
     </table>
 </div>
 
-{% if not project_stats %}
-<div class="card" style="text-align:center; color:#64748b;">
-    <p>📭 Нет проектов</p>
-    <p style="font-size:0.875rem;">Создайте проект на главной странице</p>
+<!-- Детализация по этапам с бюджетом -->
+{% if all_stages_info %}
+<div style="background: white; border-radius: 20px; padding: 1.5rem; margin-bottom: 2rem; box-shadow: 0 4px 12px rgba(0,0,0,0.02); overflow-x: auto;">
+    <h3 style="margin-bottom: 1.5rem; font-weight: 600;"><i class="fas fa-list-ul"></i> Детализация по этапам</h3>
+    <table style="width: 100%; border-collapse: collapse; min-width: 1400px;">
+        <thead>
+            <tr style="border-bottom: 1px solid #e2e8f0;">
+                <th style="padding: 1rem; text-align: left;">Проект</th>
+                <th style="padding: 1rem; text-align: left;">Этап</th>
+                <th style="padding: 1rem; text-align: left;">Длит.</th>
+                <th style="padding: 1rem; text-align: left;">Начало</th>
+                <th style="padding: 1rem; text-align: left;">Конец</th>
+                <th style="padding: 1rem; text-align: left;">Статус</th>
+                <th style="padding: 1rem; text-align: left;">Прогресс</th>
+                <th style="padding: 1rem; text-align: left;">План, ₽</th>
+                <th style="padding: 1rem; text-align: left;">Факт, ₽</th>
+                <th style="padding: 1rem; text-align: left;">Отклонение, ₽</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for stage_info in all_stages_info %}
+            {% set plan = stage_info.stage.planned_material_cost + stage_info.stage.planned_labor_cost %}
+            {% set fact = (stage_info.stage.actual_material_cost or 0) + (stage_info.stage.actual_labor_cost or 0) %}
+            <tr style="border-bottom: 1px solid #f1f5f9;">
+                <td style="padding: 1rem;">{{ stage_info.project.name }}</td>
+                <td style="padding: 1rem; font-weight: 500;">{{ stage_info.stage.name }}</td>
+                <td style="padding: 1rem;">{{ stage_info.stage.planned_duration }} дн.</td>
+                <td style="padding: 1rem;">{{ stage_info.start_date.strftime('%d.%m.%Y') if stage_info.start_date else '—' }}</td>
+                <td style="padding: 1rem;">{{ stage_info.end_date.strftime('%d.%m.%Y') if stage_info.end_date else '—' }}</td>
+                <td style="padding: 1rem;">
+                    {% if stage_info.stage.percent_complete >= 100 %}
+                        <span style="background: #dcfce7; color: #166534; padding: 4px 10px; border-radius: 30px;">Завершён</span>
+                    {% elif stage_info.is_overdue %}
+                        <span style="background: #fee2e2; color: #991b1b; padding: 4px 10px; border-radius: 30px;">Просрочен</span>
+                    {% elif stage_info.is_upcoming %}
+                        <span style="background: #fef9c3; color: #854d0e; padding: 4px 10px; border-radius: 30px;">Скоро</span>
+                    {% else %}
+                        <span style="background: #e2e8f0; color: #475569; padding: 4px 10px; border-radius: 30px;">В работе</span>
+                    {% endif %}
+                </td>
+                <td style="padding: 1rem;">
+                    <div style="display: flex; align-items: center; gap: 6px;">
+                        <span>{{ stage_info.stage.percent_complete }}%</span>
+                        <div style="background: #e2e8f0; height: 4px; width: 50px; border-radius: 2px;">
+                            <div style="background: #2563eb; height: 4px; border-radius: 2px; width: {{ stage_info.stage.percent_complete }}%;"></div>
+                        </div>
+                    </div>
+                </td>
+                <td style="padding: 1rem;">{{ "{:,.0f}".format(plan).replace(',', ' ') }}</td>
+                <td style="padding: 1rem;">{{ "{:,.0f}".format(fact).replace(',', ' ') }}</td>
+                <td style="padding: 1rem; color: {{ '#ef4444' if fact > 0 else '#10b981' if fact < 0 else '#64748b' }};">
+                    {{ "{:+,.0f}".format(fact).replace(',', ' ') }}
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
 </div>
 {% endif %}
 
-<style>
-    .progress-container {
-        background: #e2e8f0;
-        height: 8px;
-        border-radius: 4px;
-        overflow: hidden;
-    }
-    .progress-bar {
-        background: #3b82f6;
-        height: 100%;
-        border-radius: 4px;
-        transition: width 0.3s;
-    }
-    .card {
-        background: white;
-        border-radius: 12px;
-        border: 1px solid #e2e8f0;
-        padding: 1.5rem;
-    }
-</style>
+<!-- Просроченные этапы (сводка) -->
+{% if overdue_stages %}
+<div style="background: #fef2f2; border-left: 6px solid #ef4444; border-radius: 16px; padding: 1.5rem; margin-bottom: 2rem;">
+    <h3 style="margin-bottom: 1rem; color: #991b1b;"><i class="fas fa-exclamation-triangle"></i> Просроченные этапы</h3>
+    <ul style="margin-left: 1.5rem;">
+        {% for item in overdue_stages %}
+        <li style="margin-bottom: 6px;"><strong>{{ item.stage.name }}</strong> ({{ item.project.name }}) — план. дата {{ item.planned_end.strftime('%d.%m.%Y') }}, просрочка {{ item.days_overdue }} дн.</li>
+        {% endfor %}
+    </ul>
+</div>
+{% endif %}
+
+<div style="display: flex; gap: 1rem;">
+    <a href="{{ url_for('dashboard') }}" style="background: white; border: 1px solid #e2e8f0; padding: 12px 20px; border-radius: 12px; text-decoration: none; color: #1e293b;"><i class="fas fa-arrow-left"></i> К дашборду</a>
+</div>
+
+<script>
+    // Данные для графиков
+    const projectNames = {{ project_stats|map(attribute='project.name')|list|tojson }};
+    const progressData = {{ project_stats|map(attribute='progress')|list|tojson }};
+    const budgetData = {{ project_stats|map(attribute='budget')|list|tojson }};
+
+    // Столбчатая диаграмма
+    const ctxBar = document.getElementById('progressChart').getContext('2d');
+    new Chart(ctxBar, {
+        type: 'bar',
+        data: {
+            labels: projectNames,
+            datasets: [{
+                label: 'Прогресс выполнения (%)',
+                data: progressData,
+                backgroundColor: '#2563eb',
+                borderRadius: 6
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: true,
+            plugins: { legend: { display: false } },
+            scales: {
+                y: { beginAtZero: true, max: 100, grid: { color: '#e2e8f0' } },
+                x: { grid: { display: false } }
+            }
+        }
+    });
+
+    // Круговая диаграмма
+    const ctxPie = document.getElementById('budgetPieChart').getContext('2d');
+    new Chart(ctxPie, {
+        type: 'pie',
+        data: {
+            labels: projectNames,
+            datasets: [{
+                data: budgetData,
+                backgroundColor: ['#2563eb', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899', '#06b6d4'],
+                borderWidth: 0
+            }]
+        },
+        options: {
+            responsive: true,
+            plugins: { legend: { position: 'bottom' } }
+        }
+    });
+</script>
 {% endblock %}

@@ -1,0 +1,141 @@
+{% extends "base.html" %}
+{% block content %}
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+
+<h1 style="font-size: 2rem; font-weight: 600; margin-bottom: 0.5rem;">
+    <i class="fas fa-calendar-check" style="margin-right: 12px; color: #2563eb;"></i>Планирование — {{ project.name }}
+</h1>
+<p style="color: #64748b; margin-bottom: 2rem;">
+    <i class="fas fa-info-circle"></i> Сдвигайте этапы на ±1 день. Все зависимые этапы пересчитываются автоматически.
+</p>
+
+<div style="display: flex; flex-direction: column; gap: 1.5rem;" id="planning-cards">
+    {% for stage in stages %}
+    <div class="stage-card" data-stage-id="{{ stage.id }}" style="background: white; border-radius: 20px; padding: 1.5rem; box-shadow: 0 4px 12px rgba(0,0,0,0.02); border: 1px solid #f1f5f9;">
+        <div style="display: flex; align-items: flex-start; justify-content: space-between;">
+            <div style="flex: 1;">
+                <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 12px;">
+                    <h3 style="font-weight: 600; margin: 0;">{{ stage.name }}</h3>
+                    <span style="background: #e2e8f0; padding: 4px 12px; border-radius: 30px; font-size: 0.8rem;">
+                        {{ stage.planned_duration }} дн.
+                    </span>
+                    {% if stage.percent_complete >= 100 %}
+                    <span style="background: #dcfce7; color: #166534; padding: 4px 12px; border-radius: 30px; font-size: 0.8rem;">
+                        <i class="fas fa-check"></i> Завершён
+                    </span>
+                    {% endif %}
+                </div>
+                <div style="display: flex; gap: 24px; color: #475569; margin-bottom: 12px;">
+                    <div>
+                        <span style="font-size: 0.8rem; color: #64748b;">Начало</span><br>
+                        <strong class="stage-start">
+                            {% if stage.custom_start_date %}
+                                {{ stage.custom_start_date.strftime('%d.%m.%Y') }}
+                            {% elif dates.get(stage.id) %}
+                                {{ dates[stage.id][0].strftime('%d.%m.%Y') }}
+                            {% else %}
+                                —
+                            {% endif %}
+                        </strong>
+                    </div>
+                    <div>
+                        <span style="font-size: 0.8rem; color: #64748b;">Конец</span><br>
+                        <strong class="stage-end">
+                            {% if stage.custom_end_date %}
+                                {{ stage.custom_end_date.strftime('%d.%m.%Y') }}
+                            {% elif dates.get(stage.id) %}
+                                {{ dates[stage.id][1].strftime('%d.%m.%Y') }}
+                            {% else %}
+                                —
+                            {% endif %}
+                        </strong>
+                    </div>
+                    <div>
+                        <span style="font-size: 0.8rem; color: #64748b;">Зависит от</span><br>
+                        <strong>
+                            {% for dep in stage.dependencies.all() %}
+                                {{ dep.depends_on_stage.name }}{% if not loop.last %}, {% endif %}
+                            {% else %}
+                                —
+                            {% endfor %}
+                        </strong>
+                    </div>
+                </div>
+                <div style="display: flex; align-items: center; gap: 10px;">
+                    <span style="font-size: 0.9rem;">Прогресс:</span>
+                    <div style="display: flex; align-items: center; gap: 8px;">
+                        <span>{{ stage.percent_complete }}%</span>
+                        <div style="background: #e2e8f0; height: 6px; width: 100px; border-radius: 3px;">
+                            <div style="background: #2563eb; height: 6px; border-radius: 3px; width: {{ stage.percent_complete }}%;"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div style="display: flex; gap: 8px;">
+                <button class="shift-btn" data-stage-id="{{ stage.id }}" data-days="-1" style="background: white; border: 1px solid #cbd5e1; padding: 10px 16px; border-radius: 12px; cursor: pointer;" title="Сдвинуть влево на 1 день">
+                    <i class="fas fa-chevron-left"></i> -1 день
+                </button>
+                <button class="shift-btn" data-stage-id="{{ stage.id }}" data-days="1" style="background: white; border: 1px solid #cbd5e1; padding: 10px 16px; border-radius: 12px; cursor: pointer;" title="Сдвинуть вправо на 1 день">
+                    +1 день <i class="fas fa-chevron-right"></i>
+                </button>
+            </div>
+        </div>
+    </div>
+    {% endfor %}
+</div>
+
+<div style="margin-top: 2rem;">
+    <a href="{{ url_for('project_view', project_id=project.id) }}" style="background: white; border: 1px solid #e2e8f0; padding: 12px 20px; border-radius: 12px; text-decoration: none; color: #1e293b;"><i class="fas fa-arrow-left"></i> К проекту</a>
+</div>
+
+<script>
+    async function shiftStage(stageId, days) {
+        const buttons = document.querySelectorAll(`.shift-btn[data-stage-id="${stageId}"]`);
+        buttons.forEach(btn => btn.disabled = true);
+
+        try {
+            const resp = await fetch(`/project/{{ project.id }}/shift_stage/${stageId}`, {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({ days: days })
+            });
+            const data = await resp.json();
+            if (data.success) {
+                // Обновляем даты во всех карточках
+                document.querySelectorAll('.stage-card').forEach(card => {
+                    const id = card.dataset.stageId;
+                    if (data.dates[id]) {
+                        const start = new Date(data.dates[id][0]);
+                        const end = new Date(data.dates[id][1]);
+                        card.querySelector('.stage-start').textContent = start.toLocaleDateString('ru-RU');
+                        card.querySelector('.stage-end').textContent = end.toLocaleDateString('ru-RU');
+                    }
+                });
+            } else {
+                alert('Ошибка: ' + data.error);
+            }
+        } catch (err) {
+            alert('Ошибка соединения с сервером');
+        } finally {
+            buttons.forEach(btn => btn.disabled = false);
+        }
+    }
+
+    document.querySelectorAll('.shift-btn').forEach(btn => {
+        btn.addEventListener('click', function(e) {
+            e.preventDefault();
+            const stageId = this.dataset.stageId;
+            const days = parseInt(this.dataset.days);
+            shiftStage(stageId, days);
+        });
+    });
+</script>
+
+<style>
+    .stage-card { transition: box-shadow 0.2s; }
+    .stage-card:hover { box-shadow: 0 8px 20px rgba(0,0,0,0.04); }
+    .shift-btn { transition: all 0.15s; }
+    .shift-btn:hover { background: #f8fafc; border-color: #2563eb; }
+    .shift-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+</style>
+{% endblock %}

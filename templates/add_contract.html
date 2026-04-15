@@ -1,291 +1,108 @@
 {% extends "base.html" %}
 {% block content %}
-<h1>➕ Добавить договор подряда</h1>
-<p style="color:#64748b; margin-bottom:1.5rem;">Проект: {{ project.name }}</p>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
 
-<div class="card">
-    <form method="post" style="padding:0; margin:0;">
-        <!-- 1. СТОРОНЫ ДОГОВОРА -->
-        <h3 style="margin-top:0; background:#f1f5f9; padding:0.5rem; border-radius:8px;">📋 1. СТОРОНЫ ДОГОВОРА</h3>
-        
-        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
+<h1 style="font-size: 2rem; font-weight: 600; margin-bottom: 2rem;"><i class="fas fa-plus-circle" style="margin-right: 12px; color: #2563eb;"></i>Новый договор — {{ project.name }}</h1>
+
+<div style="background: white; border-radius: 20px; padding: 2rem; box-shadow: 0 4px 12px rgba(0,0,0,0.02);">
+    <form method="POST" id="contract-form">
+        <!-- Основная информация -->
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; margin-bottom: 2rem;">
             <div>
-                <label>Номер договора:</label>
-                <input type="text" name="contract_number" required placeholder="Д-01/2026">
+                <label style="display: block; margin-bottom: 6px; font-weight: 500;">Номер договора *</label>
+                <input type="text" name="contract_number" required style="width: 100%; padding: 12px; border: 1px solid #e2e8f0; border-radius: 12px;">
             </div>
             <div>
-                <label>Дата договора:</label>
-                <input type="date" name="contract_date" required>
-            </div>
-        </div>
-        
-        <h4 style="margin: 1rem 0 0.5rem 0;">🏢 Заказчик</h4>
-        <div style="background:#f8fafc; padding:1rem; border-radius:8px; margin-bottom:1rem;">
-            <div><strong>{{ project.name }}</strong></div>
-            <div>Адрес: {{ project.address or 'не указан' }}</div>
-        </div>
-        
-        <h4 style="margin: 1rem 0 0.5rem 0;">👷 Подрядчик</h4>
-        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
-            <div>
-                <label>Полное наименование:</label>
-                <input type="text" name="contractor_name" required placeholder="ООО 'СтройТех'">
-            </div>
-            <div>
-                <label>ИНН:</label>
-                <input type="text" name="contractor_inn" placeholder="7701234567">
-            </div>
-            <div>
-                <label>КПП:</label>
-                <input type="text" name="contractor_kpp" placeholder="770101001">
-            </div>
-            <div>
-                <label>ОГРН:</label>
-                <input type="text" name="contractor_ogrn" placeholder="1234567890123">
-            </div>
-            <div>
-                <label>Юридический адрес:</label>
-                <input type="text" name="contractor_address" placeholder="г. Москва, ул. Строителей, д. 1">
-            </div>
-            <div>
-                <label>Фактический адрес:</label>
-                <input type="text" name="contractor_fact_address" placeholder="г. Москва, ул. Строителей, д. 1">
-            </div>
-            <div>
-                <label>Телефон:</label>
-                <input type="text" name="contractor_phone" placeholder="+7 (495) 123-45-67">
-            </div>
-            <div>
-                <label>Email:</label>
-                <input type="email" name="contractor_email" placeholder="info@stroytech.ru">
-            </div>
-            <div>
-                <label>Руководитель (должность, ФИО):</label>
-                <input type="text" name="contractor_director" placeholder="Генеральный директор Иванов И.И.">
-            </div>
-            <div>
-                <label>Действует на основании:</label>
-                <input type="text" name="contractor_basis" placeholder="Устава, доверенности №___ от ___.___._____">
+                <label style="display: block; margin-bottom: 6px; font-weight: 500;">Дата договора *</label>
+                <input type="date" name="contract_date" required style="width: 100%; padding: 12px; border: 1px solid #e2e8f0; border-radius: 12px;">
             </div>
         </div>
-        
-        <h4 style="margin: 1rem 0 0.5rem 0;">🏦 Банковские реквизиты подрядчика</h4>
-        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
+
+        <h3 style="margin: 2rem 0 1rem; font-weight: 600;">Подрядчик</h3>
+        <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 1.5rem;">
             <div>
-                <label>Наименование банка:</label>
-                <input type="text" name="contractor_bank_name" placeholder="ПАО Сбербанк">
+                <label>Наименование *</label>
+                <input type="text" name="contractor_name" required style="width: 100%; padding: 12px; border: 1px solid #e2e8f0; border-radius: 12px;">
             </div>
-            <div>
-                <label>БИК:</label>
-                <input type="text" name="contractor_bik" placeholder="044525225">
-            </div>
-            <div>
-                <label>Расчетный счет:</label>
-                <input type="text" name="contractor_account" placeholder="40702810400000000000">
-            </div>
-            <div>
-                <label>Корреспондентский счет:</label>
-                <input type="text" name="contractor_correspondent_account" placeholder="30101810400000000225">
-            </div>
+            <div><label>ИНН</label><input type="text" name="contractor_inn" style="width: 100%; padding: 12px; border: 1px solid #e2e8f0; border-radius: 12px;"></div>
+            <div><label>КПП</label><input type="text" name="contractor_kpp" style="width: 100%; padding: 12px; border: 1px solid #e2e8f0; border-radius: 12px;"></div>
+            <div><label>ОГРН</label><input type="text" name="contractor_ogrn" style="width: 100%; padding: 12px; border: 1px solid #e2e8f0; border-radius: 12px;"></div>
+            <div class="full-width"><label>Юридический адрес</label><input type="text" name="contractor_address" style="width: 100%; padding: 12px; border: 1px solid #e2e8f0; border-radius: 12px;"></div>
+            <div><label>Телефон</label><input type="text" name="contractor_phone" style="width: 100%; padding: 12px; border: 1px solid #e2e8f0; border-radius: 12px;"></div>
+            <div><label>Email</label><input type="email" name="contractor_email" style="width: 100%; padding: 12px; border: 1px solid #e2e8f0; border-radius: 12px;"></div>
+            <div><label>Директор</label><input type="text" name="contractor_director" style="width: 100%; padding: 12px; border: 1px solid #e2e8f0; border-radius: 12px;"></div>
+            <div><label>Действует на основании</label><input type="text" name="contractor_basis" style="width: 100%; padding: 12px; border: 1px solid #e2e8f0; border-radius: 12px;"></div>
         </div>
-        
-        <!-- 2. ПРЕДМЕТ ДОГОВОРА (ВИДЫ/ОБЪЕМЫ РАБОТ) -->
-        <h3 style="margin-top: 1.5rem; background:#f1f5f9; padding:0.5rem; border-radius:8px;">📋 2. ПРЕДМЕТ ДОГОВОРА</h3>
-        
-        <div>
-            <label>Наименование объекта:</label>
-            <input type="text" name="object_name" value="{{ project.name }}" readonly style="background:#f8fafc;">
+
+        <h3 style="margin: 2rem 0 1rem; font-weight: 600;">Сроки и стоимость</h3>
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem;">
+            <div><label>Дата начала *</label><input type="date" name="start_date" required style="width: 100%; padding: 12px; border: 1px solid #e2e8f0; border-radius: 12px;"></div>
+            <div><label>Дата окончания</label><input type="date" name="end_date" style="width: 100%; padding: 12px; border: 1px solid #e2e8f0; border-radius: 12px;"></div>
+            <div><label>Общая сумма (руб) *</label><input type="number" name="total_amount" step="0.01" required style="width: 100%; padding: 12px; border: 1px solid #e2e8f0; border-radius: 12px;"></div>
         </div>
-        
-        <div>
-            <label>Местоположение объекта:</label>
-            <input type="text" name="object_address" value="{{ project.address or 'не указан' }}" readonly style="background:#f8fafc;">
-        </div>
-        
-        <div>
-            <label>Краткое описание работ:</label>
-            <textarea name="subject" rows="3" style="width:100%; padding:0.5rem; border:1px solid #e2e8f0; border-radius:8px;" placeholder="Выполнение комплекса строительно-монтажных работ по строительству объекта..."></textarea>
-        </div>
-        
-        <h4 style="margin: 1rem 0 0.5rem 0;">📊 Перечень работ (виды и объемы)</h4>
-        <div style="overflow-x: auto;">
-            <table id="worksTable" style="width:100%; border-collapse: collapse;">
-                <thead>
-                    <tr style="background:#f1f5f9;">
-                        <th style="padding: 8px; border:1px solid #e2e8f0;">№</th>
-                        <th style="padding: 8px; border:1px solid #e2e8f0;">Наименование работ</th>
-                        <th style="padding: 8px; border:1px solid #e2e8f0;">Ед. изм.</th>
-                        <th style="padding: 8px; border:1px solid #e2e8f0;">Количество</th>
-                        <th style="padding: 8px; border:1px solid #e2e8f0;">Цена за ед., руб.</th>
-                        <th style="padding: 8px; border:1px solid #e2e8f0;">Сумма, руб.</th>
-                        <th style="padding: 8px; border:1px solid #e2e8f0;"></th>
-                      </tr>
-                </thead>
-                <tbody id="worksBody">
-                    <tr class="work-row">
-                        <td style="padding: 8px; border:1px solid #e2e8f0;">1</td>
-                        <td style="padding: 8px; border:1px solid #e2e8f0;"><input type="text" name="work_name[]" style="width:100%; border:none;" placeholder="Наименование работы"></td>
-                        <td style="padding: 8px; border:1px solid #e2e8f0;"><input type="text" name="work_unit[]" style="width:80px; border:none;" placeholder="м²/м³/шт"></td>
-                        <td style="padding: 8px; border:1px solid #e2e8f0;"><input type="number" name="work_qty[]" step="0.01" style="width:100px; border:none;" placeholder="0" onchange="calculateRow(this)"></td>
-                        <td style="padding: 8px; border:1px solid #e2e8f0;"><input type="number" name="work_price[]" step="0.01" style="width:120px; border:none;" placeholder="0" onchange="calculateRow(this)"></td>
-                        <td style="padding: 8px; border:1px solid #e2e8f0;"><input type="number" name="work_total[]" step="0.01" style="width:120px; border:none; background:#f8fafc;" readonly></td>
-                        <td style="padding: 8px; border:1px solid #e2e8f0; text-align:center;"><button type="button" onclick="removeRow(this)" style="background:#ef4444; color:white; border:none; border-radius:4px; cursor:pointer;">🗑️</button></td>
-                    </tr>
-                </tbody>
-                <tfoot>
-                    <tr>
-                        <td colspan="5" style="padding: 8px; text-align: right;"><strong>ИТОГО:</strong></td>
-                        <td style="padding: 8px;"><input type="number" name="total_amount_calc" id="totalAmount" step="0.01" style="width:120px; background:#f1f5f9; font-weight:bold;" readonly></td>
-                        <td></td>
-                    </tr>
-                </tfoot>
-            </table>
-            <button type="button" onclick="addWorkRow()" style="margin-top:0.5rem; background:#3b82f6; color:white; border:none; border-radius:8px; padding:0.5rem 1rem; cursor:pointer;">➕ Добавить позицию</button>
-        </div>
-        
-        <div style="margin-top: 1rem;">
-            <label>Общая стоимость договора (руб):</label>
-            <input type="number" name="total_amount" id="contractTotalAmount" step="0.01" min="0" required placeholder="1000000">
-            <small style="color:#64748b;">Если заполнена таблица работ, общая сумма рассчитается автоматически</small>
-        </div>
-        
-        <!-- 3. ТЕХНИЧЕСКАЯ ДОКУМЕНТАЦИЯ -->
-        <h3 style="margin-top: 1.5rem; background:#f1f5f9; padding:0.5rem; border-radius:8px;">📋 3. ТЕХНИЧЕСКАЯ ДОКУМЕНТАЦИЯ</h3>
-        
-        <div>
-            <label>Перечень передаваемой документации:</label>
-            <textarea name="documentation" rows="4" style="width:100%; padding:0.5rem; border:1px solid #e2e8f0; border-radius:8px;" placeholder="1. Проектная документация (шифр: _____)&#10;2. Рабочая документация (шифр: _____)&#10;3. Сметная документация&#10;4. График производства работ"></textarea>
-        </div>
-        
-        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-top: 1rem;">
-            <div>
-                <label>Срок передачи документации:</label>
-                <input type="text" name="doc_deadline" placeholder="в течение 5 рабочих дней с даты подписания договора">
-            </div>
-            <div>
-                <label>Порядок передачи:</label>
-                <select name="doc_method" style="width:100%; padding:0.5rem; border:1px solid #e2e8f0; border-radius:8px;">
-                    <option value="на бумажном носителе">на бумажном носителе</option>
-                    <option value="в электронном виде">в электронном виде</option>
-                    <option value="на бумажном и электронном носителях">на бумажном и электронном носителях</option>
-                </select>
+
+        <h3 style="margin: 2rem 0 1rem; font-weight: 600;">Перечень работ</h3>
+        <div id="work-items-container">
+            <div class="work-item-row" style="display: grid; grid-template-columns: 2fr 1fr 1fr 1fr 1fr 40px; gap: 0.5rem; margin-bottom: 0.5rem;">
+                <input type="text" name="work_name[]" placeholder="Наименование" style="padding: 10px; border: 1px solid #e2e8f0; border-radius: 10px;">
+                <input type="text" name="work_unit[]" placeholder="Ед. изм." value="шт" style="padding: 10px; border: 1px solid #e2e8f0; border-radius: 10px;">
+                <input type="number" name="work_qty[]" placeholder="Кол-во" step="0.01" style="padding: 10px; border: 1px solid #e2e8f0; border-radius: 10px;">
+                <input type="number" name="work_price[]" placeholder="Цена" step="0.01" style="padding: 10px; border: 1px solid #e2e8f0; border-radius: 10px;">
+                <input type="number" name="work_total[]" placeholder="Сумма" step="0.01" readonly style="padding: 10px; border: 1px solid #e2e8f0; border-radius: 10px; background: #f8fafc;">
+                <button type="button" class="remove-work-item" style="background: none; border: none; color: #ef4444; font-size: 1.2rem;">&times;</button>
             </div>
         </div>
-        
-        <!-- 4. СРОКИ ВЫПОЛНЕНИЯ РАБОТ -->
-        <h3 style="margin-top: 1.5rem; background:#f1f5f9; padding:0.5rem; border-radius:8px;">📋 4. СРОКИ ВЫПОЛНЕНИЯ РАБОТ</h3>
-        
-        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
-            <div>
-                <label>Дата начала работ:</label>
-                <input type="date" name="start_date" required>
-            </div>
-            <div>
-                <label>Дата окончания работ:</label>
-                <input type="date" name="end_date">
-            </div>
-        </div>
-        
-        <!-- 5. ОСОБЫЕ УСЛОВИЯ -->
-        <h3 style="margin-top: 1.5rem; background:#f1f5f9; padding:0.5rem; border-radius:8px;">📋 5. ОСОБЫЕ УСЛОВИЯ</h3>
-        
-        <div>
-            <label>Порядок оплаты:</label>
-            <textarea name="special_conditions" rows="2" style="width:100%; padding:0.5rem; border:1px solid #e2e8f0; border-radius:8px;" placeholder="Аванс 30% в течение 5 дней после подписания договора. Окончательный расчет в течение 10 рабочих дней после подписания акта выполненных работ (КС-2)."></textarea>
-        </div>
-        
-        <div>
-            <label>Ответственность сторон:</label>
-            <textarea name="liability" rows="2" style="width:100%; padding:0.5rem; border:1px solid #e2e8f0; border-radius:8px;" placeholder="За нарушение сроков выполнения работ Подрядчик уплачивает неустойку в размере 0,1% от стоимости работ за каждый день просрочки. За нарушение сроков оплаты Заказчик уплачивает неустойку в размере 0,1% от суммы задолженности за каждый день просрочки."></textarea>
-        </div>
-        
-        <div>
-            <label>Гарантийный срок:</label>
-            <input type="text" name="warranty" placeholder="36 месяцев с даты подписания акта выполненных работ">
-        </div>
-        
-        <div style="display: flex; gap: 1rem; margin-top: 1.5rem;">
-            <button type="submit">💾 Сохранить договор</button>
-            <a href="{{ url_for('contracts', project_id=project.id) }}" class="card" style="display:inline-block; padding:0.5rem 1rem; text-decoration:none;">Отмена</a>
+        <button type="button" id="add-work-item" style="background: #f1f5f9; border: none; padding: 10px 16px; border-radius: 30px; margin-top: 1rem;"><i class="fas fa-plus"></i> Добавить позицию</button>
+
+        <div style="margin-top: 2rem; display: flex; gap: 1rem;">
+            <button type="submit" class="btn-primary" style="background: #2563eb; color: white; border: none; padding: 14px 28px; border-radius: 12px;">Сохранить договор</button>
+            <a href="{{ url_for('contracts', project_id=project.id) }}" class="btn-outline" style="background: white; border: 1px solid #cbd5e1; padding: 14px 28px; border-radius: 12px;">Отмена</a>
         </div>
     </form>
 </div>
 
 <script>
-    let rowCounter = 1;
-    
-    function calculateRow(input) {
-        const row = input.closest('.work-row');
-        const qty = parseFloat(row.querySelector('input[name="work_qty[]"]').value) || 0;
-        const price = parseFloat(row.querySelector('input[name="work_price[]"]').value) || 0;
-        const total = qty * price;
-        row.querySelector('input[name="work_total[]"]').value = total.toFixed(2);
-        calculateTotal();
+    function calculateRowTotal(row) {
+        const qty = row.querySelector('[name="work_qty[]"]')?.value || 0;
+        const price = row.querySelector('[name="work_price[]"]')?.value || 0;
+        const totalInput = row.querySelector('[name="work_total[]"]');
+        if (totalInput) totalInput.value = (qty * price).toFixed(2);
     }
-    
-    function calculateTotal() {
-        let total = 0;
-        document.querySelectorAll('input[name="work_total[]"]').forEach(input => {
-            total += parseFloat(input.value) || 0;
-        });
-        document.getElementById('totalAmount').value = total.toFixed(2);
-        document.getElementById('contractTotalAmount').value = total.toFixed(2);
-    }
-    
-    function addWorkRow() {
-        rowCounter++;
-        const tbody = document.getElementById('worksBody');
-        const newRow = document.createElement('tr');
-        newRow.className = 'work-row';
-        newRow.innerHTML = `
-            <td style="padding: 8px; border:1px solid #e2e8f0;">${rowCounter}</td>
-            <td style="padding: 8px; border:1px solid #e2e8f0;"><input type="text" name="work_name[]" style="width:100%; border:none;" placeholder="Наименование работы"></td>
-            <td style="padding: 8px; border:1px solid #e2e8f0;"><input type="text" name="work_unit[]" style="width:80px; border:none;" placeholder="м²/м³/шт"></td>
-            <td style="padding: 8px; border:1px solid #e2e8f0;"><input type="number" name="work_qty[]" step="0.01" style="width:100px; border:none;" placeholder="0" onchange="calculateRow(this)"></td>
-            <td style="padding: 8px; border:1px solid #e2e8f0;"><input type="number" name="work_price[]" step="0.01" style="width:120px; border:none;" placeholder="0" onchange="calculateRow(this)"></td>
-            <td style="padding: 8px; border:1px solid #e2e8f0;"><input type="number" name="work_total[]" step="0.01" style="width:120px; border:none; background:#f8fafc;" readonly></td>
-            <td style="padding: 8px; border:1px solid #e2e8f0; text-align:center;"><button type="button" onclick="removeRow(this)" style="background:#ef4444; color:white; border:none; border-radius:4px; cursor:pointer;">🗑️</button></td>
-        `;
-        tbody.appendChild(newRow);
-    }
-    
-    function removeRow(button) {
-        const row = button.closest('tr');
-        row.remove();
-        // Перенумеровать строки
-        document.querySelectorAll('#worksBody tr').forEach((row, index) => {
-            row.cells[0].textContent = index + 1;
-        });
-        calculateTotal();
-    }
-</script>
 
-<style>
-    .card {
-        background: white;
-        border-radius: 12px;
-        border: 1px solid #e2e8f0;
-        padding: 1.5rem;
-    }
-    input, select, textarea {
-        width: 100%;
-        padding: 0.5rem;
-        margin-bottom: 0.5rem;
-        border: 1px solid #e2e8f0;
-        border-radius: 8px;
-    }
-    button {
-        background: #3b82f6;
-        color: white;
-        padding: 0.5rem 1rem;
-        border: none;
-        border-radius: 8px;
-        cursor: pointer;
-    }
-    label {
-        display: block;
-        font-weight: 500;
-        margin-bottom: 0.25rem;
-    }
-</style>
+    document.getElementById('add-work-item').addEventListener('click', function() {
+        const container = document.getElementById('work-items-container');
+        const newRow = document.createElement('div');
+        newRow.className = 'work-item-row';
+        newRow.style.display = 'grid';
+        newRow.style.gridTemplateColumns = '2fr 1fr 1fr 1fr 1fr 40px';
+        newRow.style.gap = '0.5rem';
+        newRow.style.marginBottom = '0.5rem';
+        newRow.innerHTML = `
+            <input type="text" name="work_name[]" placeholder="Наименование" style="padding: 10px; border: 1px solid #e2e8f0; border-radius: 10px;">
+            <input type="text" name="work_unit[]" placeholder="Ед. изм." value="шт" style="padding: 10px; border: 1px solid #e2e8f0; border-radius: 10px;">
+            <input type="number" name="work_qty[]" placeholder="Кол-во" step="0.01" style="padding: 10px; border: 1px solid #e2e8f0; border-radius: 10px;">
+            <input type="number" name="work_price[]" placeholder="Цена" step="0.01" style="padding: 10px; border: 1px solid #e2e8f0; border-radius: 10px;">
+            <input type="number" name="work_total[]" placeholder="Сумма" step="0.01" readonly style="padding: 10px; border: 1px solid #e2e8f0; border-radius: 10px; background: #f8fafc;">
+            <button type="button" class="remove-work-item" style="background: none; border: none; color: #ef4444; font-size: 1.2rem;">&times;</button>
+        `;
+        container.appendChild(newRow);
+        const qtyInput = newRow.querySelector('[name="work_qty[]"]');
+        const priceInput = newRow.querySelector('[name="work_price[]"]');
+        qtyInput.addEventListener('input', () => calculateRowTotal(newRow));
+        priceInput.addEventListener('input', () => calculateRowTotal(newRow));
+    });
+
+    document.getElementById('work-items-container').addEventListener('click', function(e) {
+        if (e.target.classList.contains('remove-work-item')) {
+            e.target.closest('.work-item-row').remove();
+        }
+    });
+
+    document.querySelectorAll('.work-item-row').forEach(row => {
+        const qty = row.querySelector('[name="work_qty[]"]');
+        const price = row.querySelector('[name="work_price[]"]');
+        if (qty) qty.addEventListener('input', () => calculateRowTotal(row));
+        if (price) price.addEventListener('input', () => calculateRowTotal(row));
+    });
+</script>
 {% endblock %}

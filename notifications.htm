@@ -1,0 +1,27 @@
+{% extends "base.html" %}
+{% block content %}
+<h1>🔔 Уведомления</h1>
+{% if notifications %}
+<ul>
+    {% for n in notifications %}
+    <li style="margin-bottom:1rem; padding:1rem; border-radius:8px; {% if not n.is_read %}background:#f0f9ff; border-left:4px solid #3b82f6;{% else %}background:#f8fafc;{% endif %}">
+        <strong>{{ n.title }}</strong><br>
+        {{ n.message }}<br>
+        <small>{{ n.created_at.strftime('%d.%m.%Y %H:%M') }}</small>
+        {% if n.link %}<br><a href="{{ n.link }}">Перейти</a>{% endif %}
+        {% if not n.is_read %}
+        <button onclick="markRead({{ n.id }})" style="margin-top:0.5rem;">Отметить прочитанным</button>
+        {% endif %}
+    </li>
+    {% endfor %}
+</ul>
+{% else %}
+<p>Нет уведомлений</p>
+{% endif %}
+<script>
+async function markRead(id) {
+    await fetch('/notifications/read/' + id);
+    location.reload();
+}
+</script>
+{% endblock %}

@@ -1,23 +1,100 @@
 {% extends "base.html" %}
 {% block content %}
-<h1>Ресурсы (бригады)</h1>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
 
-{% if resources %}
-<ul>
-    {% for r in resources %}
-    <li>
-        {{ r.name }}
-        <a href="{{ url_for('delete_resource', resource_id=r.id) }}" onclick="return confirm('Удалить ресурс?')" style="color:red; margin-left:10px;">[Удалить]</a>
-    </li>
+<h1 style="font-size: 2rem; font-weight: 600; margin-bottom: 1rem;"><i class="fas fa-users" style="margin-right: 12px; color: #2563eb;"></i>Ресурсы и бригады</h1>
+<p style="color: #64748b; margin-bottom: 2rem;">Управление бригадами, просмотр загрузки и статистики</p>
+
+<!-- Форма добавления новой бригады -->
+<div style="background: white; border-radius: 20px; padding: 1.5rem; margin-bottom: 2rem; box-shadow: 0 4px 12px rgba(0,0,0,0.02);">
+    <h3 style="margin-bottom: 1rem;">Добавить бригаду / ресурс</h3>
+    <form method="POST" action="{{ url_for('add_resource') }}" style="display: flex; gap: 1rem;">
+        <input type="text" name="name" placeholder="Название (например, Бригада 1)" required style="flex:1; padding: 14px; border: 1px solid #e2e8f0; border-radius: 12px;">
+        <button type="submit" style="background: #2563eb; color: white; border: none; padding: 14px 24px; border-radius: 12px; font-weight: 500;">Добавить</button>
+    </form>
+</div>
+
+<!-- Список ресурсов -->
+<div style="display: flex; flex-direction: column; gap: 1.5rem;">
+    {% for resource in resources %}
+    {% set assignments = resource.assignments %}
+    <div class="resource-card" style="background: white; border-radius: 20px; padding: 1.5rem; box-shadow: 0 4px 12px rgba(0,0,0,0.02);">
+        <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 1rem;">
+            <div style="display: flex; align-items: center; gap: 12px;">
+                <i class="fas fa-user-hard-hat" style="font-size: 1.8rem; color: #2563eb;"></i>
+                <h2 style="font-weight: 600; margin:0;">{{ resource.name }}</h2>
+                <span style="background: #e2e8f0; padding: 4px 12px; border-radius: 30px; font-size: 0.85rem;">{{ assignments|length }} этапов</span>
+            </div>
+            <a href="{{ url_for('delete_resource', resource_id=resource.id) }}" onclick="return confirm('Удалить ресурс?')" style="color: #ef4444;"><i class="fas fa-trash"></i></a>
+        </div>
+
+        {% if assignments %}
+        <!-- Сводная статистика -->
+        {% set total_budget = namespace(materials=0, labor=0) %}
+        {% set completed = namespace(count=0) %}
+        {% set overdue = namespace(count=0) %}
+        {% for a in assignments %}
+            {% set stage = a.stage %}
+            {% set total_budget.materials = total_budget.materials + (stage.planned_material_cost or 0) %}
+            {% set total_budget.labor = total_budget.labor + (stage.planned_labor_cost or 0) %}
+            {% if stage.percent_complete >= 100 %}{% set completed.count = completed.count + 1 %}{% endif %}
+            {% if stage.percent_complete < 100 and stage.custom_end_date and stage.custom_end_date < today %}
+                {% set overdue.count = overdue.count + 1 %}
+            {% endif %}
+        {% endfor %}
+        <div style="display: flex; gap: 24px; margin-bottom: 1.5rem; color: #475569;">
+            <div><i class="fas fa-ruble-sign"></i> Бюджет: {{ "{:,.0f}".format(total_budget.materials + total_budget.labor).replace(',', ' ') }} ₽</div>
+            <div><i class="fas fa-check-circle" style="color:#10b981;"></i> Завершено: {{ completed.count }}</div>
+            <div><i class="fas fa-exclamation-triangle" style="color:#ef4444;"></i> Просрочено: {{ overdue.count }}</div>
+        </div>
+
+        <!-- Таблица этапов -->
+        <div style="overflow-x: auto;">
+            <table style="width:100%; border-collapse: collapse;">
+                <thead>
+                    <tr style="border-bottom: 1px solid #e2e8f0;">
+                        <th style="padding: 0.75rem; text-align:left;">Этап</th>
+                        <th style="padding: 0.75rem; text-align:left;">Проект</th>
+                        <th style="padding: 0.75rem; text-align:left;">Сроки</th>
+                        <th style="padding: 0.75rem; text-align:left;">Прогресс</th>
+                        <th style="padding: 0.75rem; text-align:left;">Бюджет</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for a in assignments %}
+                    {% set stage = a.stage %}
+                    <tr style="border-bottom: 1px solid #f1f5f9;">
+                        <td style="padding: 0.75rem;"><strong>{{ stage.name }}</strong></td>
+                        <td style="padding: 0.75rem;">{{ stage.project.name }}</td>
+                        <td style="padding: 0.75rem;">
+                            {{ stage.custom_start_date.strftime('%d.%m.%Y') if stage.custom_start_date else '—' }} – 
+                            {{ stage.custom_end_date.strftime('%d.%m.%Y') if stage.custom_end_date else '—' }}
+                        </td>
+                        <td style="padding: 0.75rem;">
+                            <div style="display:flex; align-items:center; gap:6px;">
+                                <span>{{ stage.percent_complete }}%</span>
+                                <div style="background:#e2e8f0; height:4px; width:60px; border-radius:2px;">
+                                    <div style="background:#2563eb; height:4px; width:{{ stage.percent_complete }}%; border-radius:2px;"></div>
+                                </div>
+                            </div>
+                        </td>
+                        <td style="padding: 0.75rem;">
+                            {{ "{:,.0f}".format(stage.planned_material_cost + stage.planned_labor_cost).replace(',', ' ') }} ₽
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <p style="color: #64748b;">Нет назначенных этапов</p>
+        {% endif %}
+    </div>
     {% endfor %}
-</ul>
-{% else %}
-<p>Нет добавленных ресурсов. Добавьте первую бригаду!</p>
-{% endif %}
+</div>
 
-<h2>Добавить ресурс</h2>
-<form action="{{ url_for('add_resource') }}" method="post">
-    <input type="text" name="name" placeholder="Название бригады" required>
-    <button type="submit">Добавить</button>
-</form>
+<script>
+    // Добавим today в контекст для шаблона
+    const today = new Date().toISOString().split('T')[0];
+</script>
 {% endblock %}

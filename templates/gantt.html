@@ -1,0 +1,106 @@
+{% extends "base.html" %}
+{% block content %}
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+
+<h1 style="font-size: 2rem; font-weight: 600; margin-bottom: 1.5rem;">
+    <i class="fas fa-chart-gantt" style="margin-right: 12px; color: #2563eb;"></i>Диаграмма Ганта — {{ project.name }}
+</h1>
+
+<div style="display: flex; gap: 1rem; margin-bottom: 2rem;">
+    <button id="zoomIn" class="btn-outline"><i class="fas fa-search-plus"></i> Приблизить</button>
+    <button id="zoomOut" class="btn-outline"><i class="fas fa-search-minus"></i> Отдалить</button>
+    <select id="viewMode" class="btn-outline">
+        <option value="Day">День</option>
+        <option value="Week" selected>Неделя</option>
+        <option value="Month">Месяц</option>
+    </select>
+    <a href="{{ url_for('project_view', project_id=project.id) }}" class="btn-outline"><i class="fas fa-arrow-left"></i> К таблице</a>
+</div>
+
+<div id="gantt-container" style="background: white; border-radius: 20px; padding: 1rem; box-shadow: 0 4px 12px rgba(0,0,0,0.02);"></div>
+
+<script>
+    const tasks = [
+        {% for stage in stages %}
+        {
+            id: '{{ stage.id }}',
+            name: '{{ stage.name }}',
+            start: '{{ dates[stage.id][0].strftime("%Y-%m-%d") if dates.get(stage.id) else project.start_date.strftime("%Y-%m-%d") }}',
+            end: '{{ dates[stage.id][1].strftime("%Y-%m-%d") if dates.get(stage.id) else (project.start_date + timedelta(days=stage.planned_duration)).strftime("%Y-%m-%d") }}',
+            progress: {{ stage.percent_complete }},
+            dependencies: [
+                {% for dep in stage.dependencies.all() %}
+                '{{ dep.depends_on_stage_id }}'{% if not loop.last %},{% endif %}
+                {% endfor %}
+            ],
+            custom_class: '{% if stage.id in critical_stages %}critical-task{% endif %}'
+        }{% if not loop.last %},{% endif %}
+        {% endfor %}
+    ];
+
+    const gantt = new Gantt("#gantt-container", tasks, {
+        header_height: 50,
+        column_width: 30,
+        step: 24,
+        view_mode: 'Week',
+        date_format: 'YYYY-MM-DD',
+        language: 'ru',
+        bar_height: 30,
+        bar_corner_radius: 5,
+        arrow_curve: 5,
+        padding: 18,
+        on_date_change: async (task, start, end) => {
+            const stageId = task.id;
+            await fetch(`/update_stage_date/{{ project.id }}`, {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({ stage_id: stageId, field: 'custom_start_date', value: start })
+            });
+            await fetch(`/update_stage_date/{{ project.id }}`, {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({ stage_id: stageId, field: 'custom_end_date', value: end })
+            });
+            alert(`Даты этапа "${task.name}" обновлены`);
+        },
+        on_progress_change: async (task, progress) => {
+            const stageId = task.id;
+            await fetch(`/update_completion_ajax/{{ project.id }}`, {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({ stage_id: stageId, percent: progress })
+            });
+            alert(`Прогресс этапа "${task.name}" изменён на ${progress}%`);
+        },
+        on_view_change: (mode) => {
+            document.getElementById('viewMode').value = mode;
+        }
+    });
+
+    document.getElementById('zoomIn').addEventListener('click', () => gantt.change_view_mode(gantt.view_mode, 1));
+    document.getElementById('zoomOut').addEventListener('click', () => gantt.change_view_mode(gantt.view_mode, -1));
+    document.getElementById('viewMode').addEventListener('change', (e) => gantt.change_view_mode(e.target.value));
+
+    const style = document.createElement('style');
+    style.textContent = `
+        .critical-task .bar { fill: #ef4444 !important; }
+        .critical-task .bar-progress { fill: #b91c1c !important; }
+    `;
+    document.head.appendChild(style);
+</script>
+
+<style>
+    .btn-outline {
+        background: white;
+        border: 1px solid #cbd5e1;
+        padding: 10px 16px;
+        border-radius: 12px;
+        font-weight: 500;
+        cursor: pointer;
+        text-decoration: none;
+        color: #1e293b;
+    }
+    .btn-outline:hover { background: #f8fafc; }
+    #gantt-container { overflow-x: auto; }
+</style>
+{% endblock %}

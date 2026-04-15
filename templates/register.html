@@ -1,37 +1,48 @@
 {% extends "base.html" %}
 {% block content %}
-<div style="max-width: 500px; margin: 0 auto;">
-    <div class="card">
-        <h1>📝 Регистрация</h1>
-        
-        {% with messages = get_flashed_messages(with_categories=true) %}
-            {% if messages %}
-                {% for category, message in messages %}
-                    <div style="padding: 10px; background: {% if category == 'error' %}#fee2e2{% else %}#d4edda{% endif %}; border-radius: 8px; margin-bottom: 1rem;">
-                        {{ message }}
-                    </div>
-                {% endfor %}
-            {% endif %}
-        {% endwith %}
-        
-        <form method="post" style="padding:0; margin:0;">
-            <label>Имя пользователя:</label>
-            <input type="text" name="username" required placeholder="Введите имя">
-            
-            <label>Email:</label>
-            <input type="email" name="email" required placeholder="email@example.com">
-            
-            <label>Пароль:</label>
-            <input type="password" name="password" required placeholder="Минимум 6 символов">
-            
-            <label>Подтверждение пароля:</label>
-            <input type="password" name="confirm_password" required>
-            
-            <button type="submit" style="width:100%; margin-top:1rem;">Зарегистрироваться</button>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+
+<div style="display: flex; align-items: center; justify-content: center; min-height: 70vh;">
+    <div style="width: 100%; max-width: 460px; background: white; border-radius: 24px; padding: 2.5rem; box-shadow: 0 20px 40px rgba(0,0,0,0.04);">
+        <div style="text-align: center; margin-bottom: 2rem;">
+            <i class="fas fa-user-plus" style="font-size: 2.5rem; color: #2563eb;"></i>
+            <h2 style="font-size: 1.8rem; font-weight: 600; margin-top: 1rem;">Регистрация</h2>
+        </div>
+        <form method="POST" style="display: flex; flex-direction: column; gap: 1.25rem;">
+            <div>
+                <label style="display: block; margin-bottom: 6px; font-weight: 500; color: #475569;">Имя пользователя</label>
+                <div style="position: relative;">
+                    <i class="far fa-user" style="position: absolute; left: 14px; top: 50%; transform: translateY(-50%); color: #94a3b8;"></i>
+                    <input type="text" name="username" placeholder="Ваше имя" required style="width: 100%; padding: 14px 14px 14px 44px; border: 1px solid #e2e8f0; border-radius: 14px;">
+                </div>
+            </div>
+            <div>
+                <label style="display: block; margin-bottom: 6px; font-weight: 500; color: #475569;">Email</label>
+                <div style="position: relative;">
+                    <i class="far fa-envelope" style="position: absolute; left: 14px; top: 50%; transform: translateY(-50%); color: #94a3b8;"></i>
+                    <input type="email" name="email" placeholder="mail@example.com" required style="width: 100%; padding: 14px 14px 14px 44px; border: 1px solid #e2e8f0; border-radius: 14px;">
+                </div>
+            </div>
+            <div>
+                <label style="display: block; margin-bottom: 6px; font-weight: 500; color: #475569;">Пароль</label>
+                <div style="position: relative;">
+                    <i class="fas fa-lock" style="position: absolute; left: 14px; top: 50%; transform: translateY(-50%); color: #94a3b8;"></i>
+                    <input type="password" name="password" placeholder="Минимум 6 символов" required style="width: 100%; padding: 14px 14px 14px 44px; border: 1px solid #e2e8f0; border-radius: 14px;">
+                </div>
+            </div>
+            <div>
+                <label style="display: block; margin-bottom: 6px; font-weight: 500; color: #475569;">Подтверждение пароля</label>
+                <div style="position: relative;">
+                    <i class="fas fa-lock" style="position: absolute; left: 14px; top: 50%; transform: translateY(-50%); color: #94a3b8;"></i>
+                    <input type="password" name="confirm_password" placeholder="Повторите пароль" required style="width: 100%; padding: 14px 14px 14px 44px; border: 1px solid #e2e8f0; border-radius: 14px;">
+                </div>
+            </div>
+            <button type="submit" style="background: #2563eb; color: white; border: none; padding: 16px; border-radius: 14px; font-weight: 500; font-size: 1rem; margin-top: 0.5rem;">
+                <i class="fas fa-check-circle" style="margin-right: 8px;"></i> Зарегистрироваться
+            </button>
         </form>
-        
-        <p style="margin-top:1rem; text-align:center;">
-            Уже есть аккаунт? <a href="{{ url_for('login') }}">Войти</a>
+        <p style="text-align: center; margin-top: 1.5rem; color: #64748b;">
+            Уже есть аккаунт? <a href="{{ url_for('login') }}" style="color: #2563eb; font-weight: 500;">Войти</a>
         </p>
     </div>
 </div>

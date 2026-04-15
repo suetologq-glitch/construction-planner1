@@ -1,63 +1,104 @@
 {% extends "base.html" %}
 {% block content %}
-<h1>{{ project.name }}</h1>
-<p style="color:#64748b; margin-bottom:1rem;">📅 Дата начала: {{ project.start_date.strftime('%Y-%m-%d') }}</p>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
 
-<!-- Погода на объекте -->
-<div class="card" style="margin-bottom: 1rem; background: linear-gradient(135deg, #3b82f6 0%, #1e40af 100%); color: white;">
-    <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap;">
-        <div>
-            <h3 style="color: white; margin:0;">🌤️ Погода на объекте</h3>
-            <p style="margin: 0.25rem 0 0 0; font-size: 0.8rem;">📍 {{ "%.4f"|format(project.latitude) }}, {{ "%.4f"|format(project.longitude) }}</p>
-            <div id="project-weather">
-                <p style="margin: 0.5rem 0;">Загрузка погоды...</p>
-            </div>
+<div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 1.5rem;">
+    <h1 style="font-size: 2rem; font-weight: 600;">{{ project.name }}</h1>
+    <div style="display: flex; gap: 1rem;">
+        <span style="background: #e2e8f0; padding: 0.3rem 0.8rem; border-radius: 30px; font-size: 0.85rem;">
+            <i class="far fa-calendar-alt" style="margin-right: 6px;"></i>Старт {{ project.start_date.strftime('%d.%m.%Y') }}
+        </span>
+        <span style="background: #e2e8f0; padding: 0.3rem 0.8rem; border-radius: 30px; font-size: 0.85rem;">
+            <i class="fas fa-map-pin" style="margin-right: 6px;"></i>{{ project.address or 'Адрес не указан' }}
+        </span>
+    </div>
+</div>
+
+<!-- Прогноз + Погода -->
+<div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; margin-bottom: 2rem;">
+    <div style="background: white; border-radius: 20px; padding: 1.5rem; box-shadow: 0 4px 12px rgba(0,0,0,0.02); border: 1px solid #f1f5f9;">
+        <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 12px;">
+            <i class="fas fa-chart-line" style="color: #2563eb; font-size: 1.5rem;"></i>
+            <h3 style="font-weight: 600; font-size: 1.2rem;">Прогноз завершения</h3>
         </div>
+        <div id="forecast-text" style="font-size: 1.8rem; font-weight: 700; color: #0f172a;">
+            {% if predicted_end %}
+                {{ predicted_end.strftime('%d.%m.%Y') }}
+                {% if deviation_days > 0 %}
+                    <span style="font-size: 0.9rem; font-weight: 500; background: #dcfce7; color: #166534; padding: 4px 10px; border-radius: 30px; margin-left: 12px;">опережение {{ deviation_days }} дн.</span>
+                {% elif deviation_days < 0 %}
+                    <span style="font-size: 0.9rem; font-weight: 500; background: #fee2e2; color: #991b1b; padding: 4px 10px; border-radius: 30px; margin-left: 12px;">отставание {{ -deviation_days }} дн.</span>
+                {% else %}
+                    <span style="font-size: 0.9rem; font-weight: 500; background: #f1f5f9; color: #475569; padding: 4px 10px; border-radius: 30px; margin-left: 12px;">по плану</span>
+                {% endif %}
+            {% else %}
+                Недостаточно данных
+            {% endif %}
+        </div>
+    </div>
+    <div id="weather-widget" style="background: linear-gradient(145deg, #1e293b, #0f172a); border-radius: 20px; padding: 1.5rem; color: white; box-shadow: 0 8px 20px rgba(0,0,0,0.05);">
+        <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 12px;">
+            <i class="fas fa-cloud-sun" style="font-size: 1.8rem;"></i>
+            <h3 style="font-weight: 500;">Погода на объекте</h3>
+        </div>
+        <div id="weather-content"><i class="fas fa-spinner fa-pulse"></i> Загрузка...</div>
     </div>
 </div>
 
 <script>
-    function loadProjectWeather() {
-        fetch(`/api/weather?lat={{ project.latitude }}&lon={{ project.longitude }}`)
-            .then(response => response.json())
-            .then(data => {
-                if (data.success) {
-                    const weatherHtml = `
-                        <p style="font-size: 1.5rem; margin: 0.5rem 0;">${data.temp}°C</p>
-                        <p style="margin: 0;">${data.description}</p>
-                        <div style="display: flex; gap: 1rem; margin-top: 0.5rem;">
-                            <span>💨 ${data.wind_speed} м/с</span>
-                            <span>💧 ${data.humidity}%</span>
-                            <span>🌡️ Ощущается ${data.feels_like}°C</span>
+function loadWeather() {
+    fetch(`/api/weather?lat={{ project.latitude }}&lon={{ project.longitude }}`)
+        .then(r => r.json())
+        .then(data => {
+            const container = document.getElementById('weather-content');
+            if (data.success) {
+                const iconCode = data.icon;
+                const iconMap = {
+                    '01d': 'sun', '01n': 'moon',
+                    '02d': 'cloud-sun', '02n': 'cloud-moon',
+                    '03d': 'cloud', '03n': 'cloud',
+                    '04d': 'cloud', '04n': 'cloud',
+                    '09d': 'cloud-rain', '09n': 'cloud-rain',
+                    '10d': 'cloud-sun-rain', '10n': 'cloud-moon-rain',
+                    '11d': 'bolt', '11n': 'bolt',
+                    '13d': 'snowflake', '13n': 'snowflake',
+                    '50d': 'smog', '50n': 'smog'
+                };
+                const icon = iconMap[iconCode] || 'cloud';
+                container.innerHTML = `
+                    <div style="display: flex; align-items: center; gap: 20px;">
+                        <i class="fas fa-${icon}" style="font-size: 3rem;"></i>
+                        <div>
+                            <span style="font-size: 2.2rem; font-weight: 600;">${data.temp}°C</span>
+                            <span style="margin-left: 10px; opacity: 0.8;">ощущается ${data.feels_like}°C</span>
                         </div>
-                    `;
-                    document.getElementById('project-weather').innerHTML = weatherHtml;
-                } else {
-                    document.getElementById('project-weather').innerHTML = '<p>❌ Не удалось загрузить погоду</p>';
-                }
-            })
-            .catch(() => {
-                document.getElementById('project-weather').innerHTML = '<p>❌ Ошибка загрузки погоды</p>';
-            });
-    }
-    loadProjectWeather();
+                    </div>
+                    <div style="margin-top: 10px; text-transform: capitalize;">${data.description}</div>
+                    <div style="display: flex; gap: 20px; margin-top: 12px; opacity: 0.8; font-size: 0.9rem;">
+                        <span><i class="fas fa-wind"></i> ${data.wind_speed} м/с</span>
+                        <span><i class="fas fa-tint"></i> ${data.humidity}%</span>
+                    </div>
+                `;
+            } else {
+                container.innerHTML = `<span style="opacity:0.7;"><i class="fas fa-exclamation-triangle"></i> Погода недоступна</span>`;
+            }
+        })
+        .catch(() => {
+            document.getElementById('weather-content').innerHTML = `<span style="opacity:0.7;"><i class="fas fa-exclamation-triangle"></i> Ошибка</span>`;
+        });
+}
+loadWeather();
 </script>
 
-<!-- Карта объекта -->
-<div class="card" style="margin-bottom: 1.5rem;">
-    <h3 style="margin-top:0;">📍 Расположение объекта</h3>
-    {% if project.address %}
-    <p><strong>Адрес:</strong> {{ project.address }}</p>
-    {% else %}
-    <p style="color:#ef4444;">⚠️ Адрес не указан. <a href="{{ url_for('edit_stage', project_id=project.id, stage_id=stages[0].id if stages else 0) }}">Добавить адрес</a></p>
-    {% endif %}
-    <div id="map" style="width: 100%; height: 400px; border-radius: 12px; overflow: hidden;"></div>
-    <p style="font-size: 0.75rem; color: #64748b; margin-top: 0.5rem;">
-        📍 Координаты: {{ "%.6f"|format(project.latitude) }}, {{ "%.6f"|format(project.longitude) }}
-        <br>💡 Кликните по карте, чтобы переместить метку
-    </p>
+<!-- Карта -->
+<div style="background: white; border-radius: 20px; padding: 1.5rem; margin-bottom: 2rem; box-shadow: 0 4px 12px rgba(0,0,0,0.02); border: 1px solid #f1f5f9;">
+    <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 16px;">
+        <i class="fas fa-map-marked-alt" style="color: #2563eb;"></i>
+        <h3 style="font-weight: 600;">Расположение</h3>
+    </div>
+    <div id="map" style="height: 320px; border-radius: 16px;"></div>
+    <p style="margin-top: 12px; font-size: 0.8rem; color: #64748b;"><i class="far fa-hand-pointer"></i> Кликните по карте, чтобы переместить метку</p>
 </div>
-
 <script src="https://api-maps.yandex.ru/2.1/?apikey=&lang=ru_RU"></script>
 <script>
     ymaps.ready(init);
@@ -65,415 +106,205 @@
         var map = new ymaps.Map("map", {
             center: [{{ project.latitude }}, {{ project.longitude }}],
             zoom: 16,
-            controls: ['zoomControl', 'fullscreenControl']
+            controls: ['zoomControl']
         });
-        
         var placemark = new ymaps.Placemark([{{ project.latitude }}, {{ project.longitude }}], {
-            balloonContent: "<strong>{{ project.name }}</strong><br/>{{ project.address or 'Адрес не указан' }}"
-        }, {
-            preset: 'islands#redBuildingIcon',
-            balloonPanelMaxMapArea: 0
-        });
-        
+            balloonContent: "<strong>{{ project.name }}</strong><br/>{{ project.address or '' }}"
+        }, { preset: 'islands#blueBuildingIcon' });
         map.geoObjects.add(placemark);
-        
         map.events.add('click', function(e) {
             var coords = e.get('coords');
-            if (confirm('Установить объект в это место?')) {
+            if (confirm('Переместить объект?')) {
                 fetch('/update_project_location/{{ project.id }}', {
                     method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
-                    body: JSON.stringify({
-                        latitude: coords[0],
-                        longitude: coords[1]
-                    })
-                }).then(response => response.json()).then(data => {
-                    if (data.success) {
-                        location.reload();
-                    }
-                });
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({ latitude: coords[0], longitude: coords[1] })
+                }).then(() => location.reload());
             }
         });
     }
 </script>
 
-<!-- Блок уведомлений о просрочках в этом проекте -->
+<!-- Просрочки -->
 {% if overdue_in_project %}
-<div class="card" style="background: #fee2e2; border-color: #ef4444; margin-bottom:1rem;">
-    <h3 style="color: #991b1b; margin-top:0;">⚠️ Просроченные этапы в этом проекте</h3>
-    <ul style="margin:0; padding-left:1rem;">
+<div style="background: #fef2f2; border-left: 6px solid #ef4444; border-radius: 16px; padding: 1.25rem 1.5rem; margin-bottom: 2rem;">
+    <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 12px;">
+        <i class="fas fa-exclamation-circle" style="color: #b91c1c;"></i>
+        <h3 style="font-weight: 600; color: #991b1b;">Просроченные этапы</h3>
+    </div>
+    <ul style="margin-left: 1.5rem; color: #7f1d1d;">
         {% for item in overdue_in_project %}
-        <li style="margin:0.5rem 0;">
-            <strong>{{ item.stage.name }}</strong> — 
-            плановая дата: {{ item.planned_end.strftime('%d.%m.%Y') }}, 
-            просрочка: <span style="color:#ef4444; font-weight:bold;">{{ item.days_overdue }} дней</span>,
-            прогресс: {{ item.stage.percent_complete }}%
-        </li>
+        <li style="margin-bottom: 6px;"><strong>{{ item.stage.name }}</strong> — план. дата {{ item.planned_end.strftime('%d.%m.%Y') }}, просрочка {{ item.days_overdue }} дн.</li>
         {% endfor %}
     </ul>
 </div>
 {% endif %}
 
-<!-- Генерация сметы по бюджету -->
-<div class="card" style="margin-bottom: 1.5rem; background: #f0fdf4; border-color: #22c55e;">
-    <h3 style="margin-top:0;">💰 Быстрая смета по бюджету</h3>
-    <p style="color:#64748b; margin-bottom:1rem;">Укажите бюджет, и система автоматически сгенерирует смету с реалистичными этапами</p>
-    
-    <form id="estimate-form" style="padding:0; margin:0;">
-        <div style="display: flex; gap: 1rem; flex-wrap: wrap; align-items: flex-end;">
-            <div style="flex: 2;">
-                <label>Бюджет (руб):</label>
-                <input type="number" id="budget-input" name="budget" min="50000" step="100000" placeholder="Например: 5000000" required style="width:100%;">
-            </div>
-            <div style="flex: 1;">
-                <label>Тип объекта:</label>
-                <select id="project-type" style="width:100%;">
-                    <option value="house">🏠 Загородный дом</option>
-                    <option value="apartment">🏢 Квартира</option>
-                    <option value="commercial">🏭 Коммерческое здание</option>
-                </select>
-            </div>
-            <div style="flex: 1;">
-                <label>Качество отделки:</label>
-                <select id="quality" style="width:100%;">
-                    <option value="econom">💰 Эконом</option>
-                    <option value="standard">⭐ Стандарт</option>
-                    <option value="premium">👑 Премиум</option>
-                </select>
-            </div>
-            <div>
-                <button type="submit" style="background:#22c55e; padding:0.625rem 1.5rem;">📊 Сгенерировать смету</button>
-            </div>
+<!-- Генерация сметы -->
+<div style="background: white; border-radius: 20px; padding: 1.5rem; margin-bottom: 2rem; box-shadow: 0 4px 12px rgba(0,0,0,0.02); border: 1px solid #f1f5f9;">
+    <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 20px;">
+        <i class="fas fa-calculator" style="color: #2563eb;"></i>
+        <h3 style="font-weight: 600;">Быстрая смета по бюджету</h3>
+    </div>
+    <form id="estimate-form" style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
+        <input type="number" id="budget-input" placeholder="Бюджет, руб" min="50000" required style="padding: 12px; border: 1px solid #e2e8f0; border-radius: 12px;">
+        <select id="quality" style="padding: 12px; border: 1px solid #e2e8f0; border-radius: 12px;">
+            <option value="econom">Эконом</option>
+            <option value="standard" selected>Стандарт</option>
+            <option value="premium">Премиум</option>
+        </select>
+        <input type="number" id="house-area" placeholder="Площадь дома, м²" value="100" style="padding: 12px; border: 1px solid #e2e8f0; border-radius: 12px;">
+        <input type="number" id="land-area" placeholder="Площадь участка, м²" value="600" style="padding: 12px; border: 1px solid #e2e8f0; border-radius: 12px;">
+        <div style="grid-column: span 2; display: flex; justify-content: flex-end;">
+            <button type="submit" style="background: #2563eb; color: white; border: none; padding: 12px 24px; border-radius: 12px; font-weight: 500; cursor: pointer;"><i class="fas fa-magic"></i> Сгенерировать</button>
         </div>
     </form>
-    
-    <div id="estimate-result" style="display: none; margin-top: 1.5rem;">
-        <h4>📋 Сгенерированная смета</h4>
-        <div style="overflow-x: auto; max-height: 400px; overflow-y: auto;">
+    <div id="estimate-result" style="display: none; margin-top: 2rem;">
+        <h4>Сгенерированная смета</h4>
+        <div style="overflow-x: auto;">
             <table id="estimate-table" style="width:100%; border-collapse: collapse;">
-                <thead>
-                    <tr style="background:#f1f5f9; position: sticky; top: 0;">
-                        <th style="padding: 8px; border: 1px solid #e2e8f0;">Название</th>
-                        <th style="padding: 8px; border: 1px solid #e2e8f0;">Длит.</th>
-                        <th style="padding: 8px; border: 1px solid #e2e8f0;">Зависит от</th>
-                        <th style="padding: 8px; border: 1px solid #e2e8f0;">Ресурсы</th>
-                        <th style="padding: 8px; border: 1px solid #e2e8f0;">План начало</th>
-                        <th style="padding: 8px; border: 1px solid #e2e8f0;">План конец</th>
-                        <th style="padding: 8px; border: 1px solid #e2e8f0;">Бюджет</th>
-                        <th style="padding: 8px; border: 1px solid #e2e8f0;">Выполнено</th>
-                        <th style="padding: 8px; border: 1px solid #e2e8f0;"></th>
-                    <tr>
-                </thead>
-                <tbody id="estimate-tbody">
-                </tbody>
-                <tfoot>
-                    <tr style="background:#f8fafc; font-weight: bold;">
-                        <td colspan="6" style="padding: 8px; text-align: right;">ИТОГО:</td>
-                        <td id="estimate-total" style="padding: 8px;">0 ₽</td>
-                        <td colspan="2"></td>
-                    </tr>
-                </tfoot>
+                <thead><tr style="background:#f1f5f9;"><th>Название</th><th>Длит.</th><th>Зависит от</th><th>Ресурсы</th><th>Начало</th><th>Конец</th><th>Бюджет</th><th></th></tr></thead>
+                <tbody id="estimate-tbody"></tbody>
+                <tfoot><tr><td colspan="6" style="text-align:right;">ИТОГО:</td><td id="estimate-total">0 ₽</td><td></td></tr></tfoot>
             </table>
         </div>
-        <div style="margin-top: 1rem; display: flex; gap: 1rem;">
-            <button id="apply-estimate-btn" style="background:#3b82f6;">➕ Добавить этапы в проект</button>
-            <button id="cancel-estimate-btn" style="background:#ef4444;">Отменить</button>
+        <div style="margin-top: 1rem;">
+            <button id="apply-estimate-btn" style="background:#2563eb; color:white; border:none; padding:8px 16px; border-radius:8px;">Добавить этапы</button>
+            <button id="cancel-estimate-btn" style="background:white; border:1px solid #cbd5e1; padding:8px 16px; border-radius:8px;">Отменить</button>
         </div>
     </div>
 </div>
 
-<script>
-    let currentEstimate = [];
-    
-    document.getElementById('estimate-form').addEventListener('submit', async function(e) {
-        e.preventDefault();
-        
-        const budget = document.getElementById('budget-input').value;
-        const type = document.getElementById('project-type').value;
-        const quality = document.getElementById('quality').value;
-        
-        if (!budget || budget < 50000) {
-            alert('Введите бюджет не менее 50 000 рублей');
-            return;
-        }
-        
-        const submitBtn = this.querySelector('button[type="submit"]');
-        const originalText = submitBtn.textContent;
-        submitBtn.textContent = '⏳ Генерация...';
-        submitBtn.disabled = true;
-        
-        try {
-            const response = await fetch('/api/generate_estimate_by_budget', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    budget: parseInt(budget),
-                    type: type,
-                    quality: quality,
-                    project_id: {{ project.id }}
-                })
-            });
-            
-            const data = await response.json();
-            
-            if (data.success) {
-                currentEstimate = data.stages;
-                renderEstimateTable(currentEstimate);
-                document.getElementById('estimate-result').style.display = 'block';
-                document.getElementById('estimate-result').scrollIntoView({ behavior: 'smooth' });
-            } else {
-                alert('Ошибка: ' + data.error);
-            }
-        } catch (error) {
-            alert('Ошибка при генерации сметы');
-        } finally {
-            submitBtn.textContent = originalText;
-            submitBtn.disabled = false;
-        }
-    });
-    
-    function renderEstimateTable(stages) {
-        const tbody = document.getElementById('estimate-tbody');
-        tbody.innerHTML = '';
-        let total = 0;
-        
-        const startDate = new Date();
-        
-        stages.forEach((stage, index) => {
-            const row = tbody.insertRow();
-            
-            row.insertCell(0).innerHTML = `<strong>${escapeHtml(stage.name)}</strong>`;
-            row.insertCell(1).textContent = stage.duration + ' дн.';
-            row.insertCell(2).textContent = stage.depends_on || '—';
-            row.insertCell(3).textContent = stage.resources;
-            
-            let start = new Date(startDate);
-            let end = new Date(startDate);
-            
-            if (stage.depends_on && stage.depends_on !== '—') {
-                const prevStage = stages.find(s => s.name === stage.depends_on);
-                if (prevStage && prevStage.endDate) {
-                    start = new Date(prevStage.endDate);
-                    start.setDate(start.getDate() + 1);
-                }
-            } else if (index > 0) {
-                const prevStage = stages[index - 1];
-                if (prevStage && prevStage.endDate) {
-                    start = new Date(prevStage.endDate);
-                    start.setDate(start.getDate() + 1);
-                }
-            }
-            
-            end = new Date(start);
-            end.setDate(start.getDate() + stage.duration - 1);
-            
-            stage.startDate = start;
-            stage.endDate = end;
-            
-            row.insertCell(4).textContent = formatDate(start);
-            row.insertCell(5).textContent = formatDate(end);
-            row.insertCell(6).textContent = formatNumber(stage.budget) + ' ₽';
-            total += stage.budget;
-            row.insertCell(7).textContent = '0%';
-            
-            const checkCell = row.insertCell(8);
-            const checkbox = document.createElement('input');
-            checkbox.type = 'checkbox';
-            checkbox.checked = true;
-            checkbox.dataset.index = index;
-            checkbox.addEventListener('change', () => updateEstimateTotal());
-            checkCell.appendChild(checkbox);
-        });
-        
-        document.getElementById('estimate-total').textContent = formatNumber(total) + ' ₽';
-        window.estimateStages = stages;
-    }
-    
-    function updateEstimateTotal() {
-        let total = 0;
-        const checkboxes = document.querySelectorAll('#estimate-tbody input[type="checkbox"]');
-        checkboxes.forEach((cb, idx) => {
-            if (cb.checked && window.estimateStages && window.estimateStages[idx]) {
-                total += window.estimateStages[idx].budget;
-            }
-        });
-        document.getElementById('estimate-total').textContent = formatNumber(total) + ' ₽';
-    }
-    
-    function formatDate(date) {
-        return date.toLocaleDateString('ru-RU');
-    }
-    
-    function formatNumber(num) {
-        return num.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ' ');
-    }
-    
-    function escapeHtml(text) {
-        const div = document.createElement('div');
-        div.textContent = text;
-        return div.innerHTML;
-    }
-    
-    document.getElementById('apply-estimate-btn').addEventListener('click', async function() {
-        const checkboxes = document.querySelectorAll('#estimate-tbody input[type="checkbox"]:checked');
-        if (checkboxes.length === 0) {
-            alert('Выберите хотя бы один этап для добавления');
-            return;
-        }
-        
-        const selectedStages = [];
-        checkboxes.forEach(cb => {
-            const idx = parseInt(cb.dataset.index);
-            if (window.estimateStages && window.estimateStages[idx]) {
-                selectedStages.push(window.estimateStages[idx]);
-            }
-        });
-        
-        this.disabled = true;
-        this.textContent = '⏳ Добавление...';
-        
-        try {
-            const response = await fetch('/api/add_estimate_stages/{{ project.id }}', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ stages: selectedStages })
-            });
-            
-            const data = await response.json();
-            
-            if (data.success) {
-                alert(`✅ Добавлено ${data.count} этапов! Страница будет обновлена.`);
-                location.reload();
-            } else {
-                alert('Ошибка: ' + data.error);
-            }
-        } catch (error) {
-            alert('Ошибка при добавлении этапов');
-        } finally {
-            this.disabled = false;
-            this.textContent = '➕ Добавить этапы в проект';
-        }
-    });
-    
-    document.getElementById('cancel-estimate-btn').addEventListener('click', function() {
-        document.getElementById('estimate-result').style.display = 'none';
-        document.getElementById('budget-input').value = '';
-    });
-</script>
+<!-- Таблица этапов -->
+<div style="display: flex; justify-content: space-between; align-items: center; margin: 2rem 0 1rem;">
+    <h2 style="font-weight: 600; font-size: 1.5rem;"><i class="fas fa-list-check" style="margin-right: 10px; color: #2563eb;"></i>Этапы работ</h2>
+    <button id="show-add-stage-form" style="background: white; border: 1px solid #cbd5e1; padding: 10px 18px; border-radius: 12px; font-weight: 500; cursor: pointer;"><i class="fas fa-plus"></i> Добавить этап</button>
+</div>
 
-<h2>📋 Этапы работ</h2>
+<div style="margin-bottom: 12px; font-size: 0.85rem; color: #64748b;">
+    <span style="display: inline-block; width: 12px; height: 12px; background: #fef9c3; border: 1px solid #eab308; border-radius: 3px; margin-right: 6px;"></span>
+    Завершается в ближайшие 7 дней
+</div>
 
-<style>
-    .tooltip {
-        position: relative;
-        display: inline-block;
-        cursor: help;
-        border-bottom: 1px dashed #94a3b8;
-    }
-    .tooltip .tooltiptext {
-        visibility: hidden;
-        width: 220px;
-        background-color: #1e293b;
-        color: #fff;
-        text-align: left;
-        border-radius: 8px;
-        padding: 8px 12px;
-        position: absolute;
-        z-index: 1;
-        bottom: 125%;
-        left: 50%;
-        margin-left: -110px;
-        font-size: 12px;
-        font-weight: normal;
-        box-shadow: 0 2px 8px rgba(0,0,0,0.2);
-        pointer-events: none;
-    }
-    .tooltip .tooltiptext::after {
-        content: "";
-        position: absolute;
-        top: 100%;
-        left: 50%;
-        margin-left: -5px;
-        border-width: 5px;
-        border-style: solid;
-        border-color: #1e293b transparent transparent transparent;
-    }
-    .tooltip:hover .tooltiptext {
-        visibility: visible;
-    }
-</style>
+<div id="add-stage-form" style="display: none; background: white; border-radius: 20px; padding: 1.5rem; margin-bottom: 2rem; box-shadow: 0 4px 12px rgba(0,0,0,0.02); border: 1px solid #f1f5f9;">
+    <h3 style="margin-bottom: 1.5rem;">Новый этап</h3>
+    <form id="stage-form" style="display: grid; gap: 1.2rem;">
+        <input type="hidden" name="project_id" value="{{ project.id }}">
+        <div>
+            <label style="display: block; margin-bottom: 6px; font-weight: 500; color: #475569;">Название этапа *</label>
+            <input type="text" name="name" placeholder="Например: Фундамент" required style="width: 100%; padding: 12px; border: 1px solid #e2e8f0; border-radius: 12px;">
+        </div>
+        <div>
+            <label style="display: block; margin-bottom: 6px; font-weight: 500; color: #475569;">Длительность (рабочих дней) *</label>
+            <input type="number" name="duration" min="1" value="7" style="width: 100%; padding: 12px; border: 1px solid #e2e8f0; border-radius: 12px;">
+        </div>
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
+            <div>
+                <label style="display: block; margin-bottom: 6px; font-weight: 500; color: #475569;">План. материалы (₽)</label>
+                <input type="number" name="planned_material_cost" min="0" value="0" placeholder="0" style="width: 100%; padding: 12px; border: 1px solid #e2e8f0; border-radius: 12px;">
+            </div>
+            <div>
+                <label style="display: block; margin-bottom: 6px; font-weight: 500; color: #475569;">План. работа (₽)</label>
+                <input type="number" name="planned_labor_cost" min="0" value="0" placeholder="0" style="width: 100%; padding: 12px; border: 1px solid #e2e8f0; border-radius: 12px;">
+            </div>
+        </div>
+        <div>
+            <label style="display: block; margin-bottom: 6px; font-weight: 500; color: #475569;">Зависит от (выберите несколько с Ctrl)</label>
+            <select name="depends" multiple style="width: 100%; padding: 12px; border: 1px solid #e2e8f0; border-radius: 12px; min-height: 100px;">
+                {% for s in stages %}
+                <option value="{{ s.id }}">{{ s.name }}</option>
+                {% endfor %}
+            </select>
+            <p style="font-size: 0.8rem; color: #64748b; margin-top: 4px;">Если зависимостей нет, оставьте пустым</p>
+        </div>
+        <div>
+            <label style="display: block; margin-bottom: 6px; font-weight: 500; color: #475569;">Ресурсы (выберите несколько с Ctrl)</label>
+            <select name="resources" multiple style="width: 100%; padding: 12px; border: 1px solid #e2e8f0; border-radius: 12px; min-height: 100px;">
+                {% for r in resources %}
+                <option value="{{ r.id }}">{{ r.name }}</option>
+                {% endfor %}
+            </select>
+            <p style="font-size: 0.8rem; color: #64748b; margin-top: 4px;">Если не назначены, оставьте пустым</p>
+        </div>
+        <div style="display: flex; gap: 1rem; justify-content: flex-end;">
+            <button type="submit" style="background: #2563eb; color: white; border: none; padding: 12px 24px; border-radius: 12px; font-weight: 500;">Добавить этап</button>
+            <button type="button" id="cancel-add" style="background: white; border: 1px solid #cbd5e1; padding: 12px 24px; border-radius: 12px;">Отмена</button>
+        </div>
+    </form>
+</div>
 
 {% if stages %}
-<div style="overflow-x: auto;">
-    <table style="width:100%; border-collapse: collapse;">
+<div style="overflow-x: auto; border-radius: 20px; background: white; box-shadow: 0 4px 12px rgba(0,0,0,0.02); border: 1px solid #f1f5f9;">
+    <table style="width: 100%; border-collapse: collapse; min-width: 1200px;">
         <thead>
-            <tr style="background:#f1f5f9;">
-                <th style="padding: 12px; border: 1px solid #e2e8f0;">Название</th>
-                <th style="padding: 12px; border: 1px solid #e2e8f0;">Длит.</th>
-                <th style="padding: 12px; border: 1px solid #e2e8f0;">Зависит от</th>
-                <th style="padding: 12px; border: 1px solid #e2e8f0;">Ресурсы</th>
-                <th style="padding: 12px; border: 1px solid #e2e8f0;">План начало</th>
-                <th style="padding: 12px; border: 1px solid #e2e8f0;">План конец</th>
-                <th style="padding: 12px; border: 1px solid #e2e8f0;">Бюджет</th>
-                <th style="padding: 12px; border: 1px solid #e2e8f0;">Выполнено</th>
-                <th style="padding: 12px; border: 1px solid #e2e8f0;">Действия</th>
+            <tr style="background: #f8fafc; border-bottom: 1px solid #e2e8f0;">
+                <th style="padding: 1rem;">Название</th><th style="padding: 1rem;">Длит.</th><th style="padding: 1rem;">Зависит от</th><th style="padding: 1rem;">Ресурсы</th>
+                <th style="padding: 1rem;">Начало</th><th style="padding: 1rem;">Конец</th><th style="padding: 1rem;">Бюджет</th><th style="padding: 1rem;">Выполнено</th><th style="padding: 1rem;"></th>
             </tr>
         </thead>
-        <tbody>
+        <tbody id="stages-table">
             {% for stage in stages %}
-            <tr>
-                <td style="padding: 10px; border: 1px solid #e2e8f0;"><strong>{{ stage.name }}</strong>{% if stage.id in critical_stages %} 🔴{% endif %}{% if stage.id in overdue_in_project|map(attribute='stage')|map(attribute='id')|list %} ⏰{% endif %}</td>
-                <td style="padding: 10px; border: 1px solid #e2e8f0;">{{ stage.planned_duration }} дн.</td>
-                <td style="padding: 10px; border: 1px solid #e2e8f0;">
-                    {% set deps = stage.dependencies.all() %}
-                    {% for dep in deps %}
+            {% set plan_material = stage.planned_material_cost %}
+            {% set plan_labor = stage.planned_labor_cost %}
+            {% set fact_material = stage.actual_material_cost or 0 %}
+            {% set fact_labor = stage.actual_labor_cost or 0 %}
+            {% set total_material = plan_material + fact_material %}
+            {% set total_labor = plan_labor + fact_labor %}
+            {% set total_budget = total_material + total_labor %}
+            <tr data-stage-id="{{ stage.id }}" 
+                data-end-date="{% if stage.custom_end_date %}{{ stage.custom_end_date.strftime('%Y-%m-%d') }}{% elif dates.get(stage.id) %}{{ dates[stage.id][1].strftime('%Y-%m-%d') }}{% endif %}"
+                data-percent="{{ stage.percent_complete }}"
+                style="border-bottom: 1px solid #f1f5f9;">
+                <td style="padding: 1rem; font-weight: 500;">{{ stage.name }}</td>
+                <td style="padding: 1rem;">{{ stage.planned_duration }} дн.</td>
+                <td style="padding: 1rem;">
+                    {% for dep in stage.dependencies.all() %}
                         {{ dep.depends_on_stage.name }}{% if not loop.last %}, {% endif %}
                     {% endfor %}
                 </td>
-                <td style="padding: 10px; border: 1px solid #e2e8f0;">{{ assignments.get(stage.id, [])|join(', ') }}</td>
-                <td style="padding: 10px; border: 1px solid #e2e8f0;">{% if dates.get(stage.id) %}{{ dates[stage.id][0].strftime('%d.%m.%Y') }}{% else %}—{% endif %}</td>
-                <td style="padding: 10px; border: 1px solid #e2e8f0;">{% if dates.get(stage.id) %}{{ dates[stage.id][1].strftime('%d.%m.%Y') }}{% else %}—{% endif %}</td>
-                <td style="padding: 10px; border: 1px solid #e2e8f0;">
-                    {% set total_planned = stage.planned_material_cost + stage.planned_labor_cost %}
-                    {% if total_planned > 0 %}
-                        <div class="tooltip">
-                            {{ "%.0f"|format(total_planned) }} ₽
-                            <span class="tooltiptext">
-                                🧱 Материалы: {{ "%.0f"|format(stage.planned_material_cost) }} ₽<br>
-                                👷 Работа: {{ "%.0f"|format(stage.planned_labor_cost) }} ₽<br>
-                                💰 Итого: {{ "%.0f"|format(total_planned) }} ₽
-                            </span>
+                <td style="padding: 1rem;">{{ assignments.get(stage.id, [])|join(', ') }}</td>
+                <td style="padding: 1rem;">
+                    <input type="date" class="stage-start-input" data-stage-id="{{ stage.id }}"
+                           value="{% if stage.custom_start_date %}{{ stage.custom_start_date.strftime('%Y-%m-%d') }}{% elif dates.get(stage.id) %}{{ dates[stage.id][0].strftime('%Y-%m-%d') }}{% endif %}"
+                           style="border: 1px solid #e2e8f0; border-radius: 8px; padding: 6px;">
+                </td>
+                <td style="padding: 1rem;">
+                    <input type="date" class="stage-end-input" data-stage-id="{{ stage.id }}"
+                           value="{% if stage.custom_end_date %}{{ stage.custom_end_date.strftime('%Y-%m-%d') }}{% elif dates.get(stage.id) %}{{ dates[stage.id][1].strftime('%Y-%m-%d') }}{% endif %}"
+                           style="border: 1px solid #e2e8f0; border-radius: 8px; padding: 6px;">
+                </td>
+                <td style="padding: 1rem;">
+                    <div class="budget-cell" data-stage-id="{{ stage.id }}">
+                        <span class="budget-display" style="cursor: pointer; border-bottom: 1px dashed #94a3b8;">
+                            {% if total_budget > 0 %}
+                                {{ "{:,.0f}".format(total_budget).replace(',', ' ') }} ₽
+                            {% else %}
+                                —
+                            {% endif %}
+                        </span>
+                        <div class="budget-edit" style="display: none; margin-top: 8px;">
+                            <input type="number" class="edit-material" placeholder="Материалы" value="{{ total_material }}" style="width: 100px; padding: 4px; margin-right: 4px;">
+                            <input type="number" class="edit-labor" placeholder="Работа" value="{{ total_labor }}" style="width: 100px; padding: 4px; margin-right: 4px;">
+                            <button class="save-budget-btn" style="padding: 4px 8px; background: #2563eb; color: white; border: none; border-radius: 4px;">✓</button>
+                            <button class="cancel-budget-btn" style="padding: 4px 8px; background: #e2e8f0; border: none; border-radius: 4px;">✗</button>
                         </div>
-                        {% if stage.actual_material_cost > 0 or stage.actual_labor_cost > 0 %}
-                            <div class="tooltip" style="margin-top: 4px; font-size: 0.7rem; color: #64748b;">
-                                📊 факт: {{ "%.0f"|format(stage.actual_material_cost + stage.actual_labor_cost) }} ₽
-                                <span class="tooltiptext">
-                                    ✅ Факт материалы: {{ "%.0f"|format(stage.actual_material_cost) }} ₽<br>
-                                    ✅ Факт работа: {{ "%.0f"|format(stage.actual_labor_cost) }} ₽
-                                </span>
-                            </div>
-                        {% endif %}
-                    {% else %}
-                        —
-                    {% endif %}
-                </td>
-                <td style="padding: 10px; border: 1px solid #e2e8f0; white-space: nowrap;">
-                    <div style="display: flex; align-items: center; gap: 0.5rem;">
-                        <input type="number" id="percent-{{ stage.id }}" 
-                               class="percent-input" 
-                               data-stage-id="{{ stage.id }}"
-                               min="0" max="100" 
-                               value="{{ stage.percent_complete }}" 
-                               style="width:70px; padding:0.25rem;">
-                        <button class="update-percent-btn" data-stage-id="{{ stage.id }}" style="padding:0.25rem 0.5rem;">Обн.</button>
+                        <span class="tooltip-content" style="display: none;">
+                            🧱 Материалы: {{ "{:,.0f}".format(total_material).replace(',', ' ') }} ₽<br>
+                            👷 Работа: {{ "{:,.0f}".format(total_labor).replace(',', ' ') }} ₽<br>
+                            <small style="opacity:0.7;">план: {{ "{:,.0f}".format(plan_material+plan_labor).replace(',', ' ') }} ₽ / факт: {{ "{:,.0f}".format(fact_material+fact_labor).replace(',', ' ') }} ₽</small>
+                        </span>
                     </div>
-                    <div class="percent-display-{{ stage.id }}" style="font-size:0.75rem; margin-top:0.25rem;">{{ stage.percent_complete }}%</div>
                 </td>
-                <td style="padding: 10px; border: 1px solid #e2e8f0; white-space: nowrap;">
-                    <a href="{{ url_for('edit_stage', project_id=project.id, stage_id=stage.id) }}" style="font-size:0.875rem;">✏️ Редактировать</a><br>
-                    <a href="{{ url_for('delete_stage', project_id=project.id, stage_id=stage.id) }}" onclick="return confirm('Удалить этап?')" style="font-size:0.875rem; color:#ef4444;">🗑️ Удалить</a>
+                <td style="padding: 1rem;">
+                    <div style="display: flex; align-items: center; gap: 8px;">
+                        <input type="number" class="percent-input" data-stage-id="{{ stage.id }}" min="0" max="100" value="{{ stage.percent_complete }}" style="width: 65px; border: 1px solid #e2e8f0; border-radius: 8px; padding: 6px;">
+                        <button class="update-percent-btn" data-stage-id="{{ stage.id }}" style="background: none; border: none; color: #2563eb; cursor: pointer;"><i class="fas fa-check"></i></button>
+                        <span class="percent-display-{{ stage.id }}">{{ stage.percent_complete }}%</span>
+                    </div>
+                </td>
+                <td style="padding: 1rem;">
+                    <button class="edit-stage-btn" data-stage-id="{{ stage.id }}" style="background: none; border: none; color: #64748b; margin-right: 8px;"><i class="fas fa-pen"></i></button>
+                    <button class="delete-stage-btn" data-stage-id="{{ stage.id }}" style="background: none; border: none; color: #ef4444;"><i class="fas fa-trash"></i></button>
                 </td>
             </tr>
             {% endfor %}
@@ -481,222 +312,378 @@
     </table>
 </div>
 
-<div class="budget-summary" style="margin-top: 1.5rem;">
+<!-- Сводка бюджета -->
+<div style="display: grid; grid-template-columns: repeat(4,1fr); gap: 1.5rem; margin: 2rem 0;">
     {% set total_planned = stages|sum(attribute='planned_material_cost') + stages|sum(attribute='planned_labor_cost') %}
     {% set total_actual = stages|sum(attribute='actual_material_cost') + stages|sum(attribute='actual_labor_cost') %}
-    {% set total_planned_materials = stages|sum(attribute='planned_material_cost') %}
-    {% set total_planned_labor = stages|sum(attribute='planned_labor_cost') %}
-    {% set total_actual_materials = stages|sum(attribute='actual_material_cost') %}
-    {% set total_actual_labor = stages|sum(attribute='actual_labor_cost') %}
-    
-    <div class="budget-stats" style="display: flex; gap: 2rem; flex-wrap: wrap;">
-        <div class="budget-item tooltip">
-            <div class="budget-label" style="font-size: 0.75rem; color: #64748b;">Плановый бюджет</div>
-            <div class="budget-value" style="font-size: 1.5rem; font-weight: bold;" id="total-planned">{{ "%.2f"|format(total_planned) }} ₽</div>
-            <span class="tooltiptext" style="width: 200px;">
-                🧱 Материалы: {{ "%.0f"|format(total_planned_materials) }} ₽<br>
-                👷 Работа: {{ "%.0f"|format(total_planned_labor) }} ₽
-            </span>
+    <div style="background: white; border-radius: 20px; padding: 1.5rem; box-shadow: 0 4px 12px rgba(0,0,0,0.02);">
+        <div style="color: #64748b; font-size: 0.85rem; margin-bottom: 8px;">Плановый бюджет</div>
+        <div style="font-size: 1.8rem; font-weight: 700;" id="total-planned">{{ "{:,.0f}".format(total_planned).replace(',', ' ') }} ₽</div>
+    </div>
+    <div style="background: white; border-radius: 20px; padding: 1.5rem; box-shadow: 0 4px 12px rgba(0,0,0,0.02);">
+        <div style="color: #64748b; font-size: 0.85rem; margin-bottom: 8px;">Фактические затраты</div>
+        <div style="font-size: 1.8rem; font-weight: 700;" id="total-actual">{{ "{:,.0f}".format(total_actual).replace(',', ' ') }} ₽</div>
+    </div>
+    <div style="background: white; border-radius: 20px; padding: 1.5rem; box-shadow: 0 4px 12px rgba(0,0,0,0.02);">
+        <div style="color: #64748b; font-size: 0.85rem; margin-bottom: 8px;">Отклонение</div>
+        {% set diff = total_actual - total_planned %}
+        <div style="font-size: 1.8rem; font-weight: 700; color: {{ '#ef4444' if diff > 0 else '#10b981' if diff < 0 else '#64748b' }};" id="budget-diff">
+            {{ ("↑ " if diff > 0 else "↓ " if diff < 0 else "") + "{:,.0f}".format(diff|abs).replace(',', ' ') }} ₽
         </div>
-        <div class="budget-item tooltip">
-            <div class="budget-label" style="font-size: 0.75rem; color: #64748b;">Фактические затраты</div>
-            <div class="budget-value" style="font-size: 1.5rem; font-weight: bold;" id="total-actual">{{ "%.2f"|format(total_actual) }} ₽</div>
-            <span class="tooltiptext" style="width: 200px;">
-                ✅ Материалы: {{ "%.0f"|format(total_actual_materials) }} ₽<br>
-                ✅ Работа: {{ "%.0f"|format(total_actual_labor) }} ₽
-            </span>
-        </div>
-        <div class="budget-item">
-            <div class="budget-label" style="font-size: 0.75rem; color: #64748b;">Отклонение</div>
-            {% set diff = total_actual - total_planned %}
-            <div class="budget-value" style="font-size: 1.5rem; font-weight: bold; color: {% if diff > 0 %}#ef4444{% elif diff < 0 %}#10b981{% else %}#64748b{% endif %};" id="budget-diff">
-                {% if diff > 0 %}↑ {{ "%.2f"|format(diff) }} ₽
-                {% elif diff < 0 %}↓ {{ "%.2f"|format(0 - diff) }} ₽
-                {% else %}0 ₽{% endif %}
-            </div>
-        </div>
-        <div class="budget-item">
-            <div class="budget-label" style="font-size: 0.75rem; color: #64748b;">Процент освоения</div>
-            <div class="budget-value" style="font-size: 1.5rem; font-weight: bold;" id="budget-usage">
-                {% if total_planned > 0 %}
-                    {{ (total_actual / total_planned * 100)|round(1) }}%
-                {% else %}
-                    0%
-                {% endif %}
-            </div>
-        </div>
-        <div class="budget-item">
-            <div class="budget-label" style="font-size: 0.75rem; color: #64748b;">Общий прогресс</div>
-            {% set total_stages = stages|length %}
-            {% set completed_stages = stages|selectattr('percent_complete', 'ge', 100)|list|length %}
-            {% set overall_progress = (completed_stages / total_stages * 100)|round(1) if total_stages > 0 else 0 %}
-            <div class="budget-value" style="font-size: 1.5rem; font-weight: bold; color: #3b82f6;" id="overall-progress">{{ overall_progress }}%</div>
-            <div class="progress-container" style="margin-top: 0.5rem;">
-                <div class="progress-bar" style="width: {{ overall_progress }}%; background: #3b82f6;" id="progress-bar"></div>
-            </div>
-            <div style="font-size: 0.7rem; color: #64748b; margin-top: 0.25rem;">Выполнено {{ completed_stages }}/{{ total_stages }} этапов</div>
+    </div>
+    <div style="background: white; border-radius: 20px; padding: 1.5rem; box-shadow: 0 4px 12px rgba(0,0,0,0.02);">
+        <div style="color: #64748b; font-size: 0.85rem; margin-bottom: 8px;">Общий прогресс</div>
+        {% set compl = stages|selectattr('percent_complete', 'ge', 100)|list|length %}
+        <div style="font-size: 1.8rem; font-weight: 700;" id="overall-progress">{{ (compl / stages|length * 100)|round(1) if stages else 0 }}%</div>
+        <div style="background: #e2e8f0; height: 6px; border-radius: 3px; margin-top: 12px;">
+            <div id="progress-bar" style="background: #2563eb; height: 6px; border-radius: 3px; width: {{ (compl / stages|length * 100)|round(1) if stages else 0 }}%;"></div>
         </div>
     </div>
 </div>
-
 {% else %}
-<div class="card" style="text-align:center; color:#64748b;">
-    <p>📭 Нет добавленных этапов</p>
-</div>
+<div style="text-align: center; padding: 3rem; background: white; border-radius: 20px; color: #64748b;">Нет добавленных этапов</div>
 {% endif %}
 
-<div style="display: flex; gap: 1rem; flex-wrap: wrap; margin: 1.5rem 0;">
-    <a href="{{ url_for('add_stage', project_id=project.id) }}" class="card" style="display:inline-block; padding:0.75rem 1.5rem; text-decoration:none; background:#f1f5f9; border-radius:8px;">➕ Добавить этап</a>
-    <a href="{{ url_for('import_stages', project_id=project.id) }}" class="card" style="display:inline-block; padding:0.75rem 1.5rem; text-decoration:none; background:#f1f5f9; border-radius:8px;">📥 Импорт из Excel</a>
-    <a href="{{ url_for('export_project', project_id=project.id) }}" class="card" style="display:inline-block; padding:0.75rem 1.5rem; text-decoration:none; background:#f1f5f9; border-radius:8px;">📊 Экспорт в Excel</a>
-    <a href="{{ url_for('export_csv', project_id=project.id) }}" class="card" style="display:inline-block; padding:0.75rem 1.5rem; text-decoration:none; background:#f1f5f9; border-radius:8px;">📄 Экспорт в CSV</a>
-    <a href="{{ url_for('project_calendar', project_id=project.id) }}" class="card" style="display:inline-block; padding:0.75rem 1.5rem; text-decoration:none; background:#f1f5f9; border-radius:8px;">📅 Календарь этапов</a>
-    <a href="{{ url_for('photos_view', project_id=project.id) }}" class="card" style="display:inline-block; padding:0.75rem 1.5rem; text-decoration:none; background:#f1f5f9; border-radius:8px;">📸 Фотоотчёты ({{ project.photos|length }})</a>
-    <a href="{{ url_for('purchase_plan', project_id=project.id) }}" class="card" style="display:inline-block; padding:0.75rem 1.5rem; text-decoration:none; background:#f1f5f9; border-radius:8px;">📦 План закупок</a>
-    <a href="{{ url_for('acts', project_id=project.id) }}" class="card" style="display:inline-block; padding:0.75rem 1.5rem; text-decoration:none; background:#f1f5f9; border-radius:8px;">📄 Акты КС-2</a>
-    <a href="{{ url_for('contracts', project_id=project.id) }}" class="card" style="display:inline-block; padding:0.75rem 1.5rem; text-decoration:none; background:#f1f5f9; border-radius:8px;">📝 Договоры</a>
-    <a href="{{ url_for('s_curve', project_id=project.id) }}" class="card" style="display:inline-block; padding:0.75rem 1.5rem; text-decoration:none; background:#f1f5f9; border-radius:8px;">📊 Аналитика</a>
+<!-- Панель действий -->
+<div style="display: flex; flex-wrap: wrap; gap: 1rem; margin: 2rem 0;">
+    <a href="{{ url_for('import_stages', project_id=project.id) }}" style="background: white; border: 1px solid #e2e8f0; padding: 12px 20px; border-radius: 12px; text-decoration: none; color: #1e293b;"><i class="fas fa-upload"></i> Импорт Excel</a>
+    <a href="{{ url_for('export_project', project_id=project.id) }}" style="background: white; border: 1px solid #e2e8f0; padding: 12px 20px; border-radius: 12px; text-decoration: none; color: #1e293b;"><i class="fas fa-download"></i> Экспорт Excel</a>
+    <a href="{{ url_for('project_planning', project_id=project.id) }}" style="background: white; border: 1px solid #e2e8f0; padding: 12px 20px; border-radius: 12px; text-decoration: none; color: #1e293b;"><i class="fas fa-calendar-check"></i> Планирование</a>
+    <a href="{{ url_for('purchase_plan', project_id=project.id) }}" style="background: white; border: 1px solid #e2e8f0; padding: 12px 20px; border-radius: 12px; text-decoration: none; color: #1e293b;"><i class="fas fa-box"></i> Закупки</a>
+    <a href="{{ url_for('contracts', project_id=project.id) }}" style="background: white; border: 1px solid #e2e8f0; padding: 12px 20px; border-radius: 12px; text-decoration: none; color: #1e293b;"><i class="fas fa-file-contract"></i> Договоры</a>
+    <a href="{{ url_for('photos_view', project_id=project.id) }}" style="background: white; border: 1px solid #e2e8f0; padding: 12px 20px; border-radius: 12px; text-decoration: none; color: #1e293b;"><i class="fas fa-camera"></i> Фотоотчёты</a>
+    <a href="{{ url_for('project_team', project_id=project.id) }}" style="background: white; border: 1px solid #e2e8f0; padding: 12px 20px; border-radius: 12px; text-decoration: none; color: #1e293b;"><i class="fas fa-users"></i> Команда</a>
+</div>
+
+<!-- Сохранение в шаблон -->
+<div style="background: white; border-radius: 20px; padding: 1.5rem; margin-top: 1rem;">
+    <h3 style="margin-bottom: 1rem;">Сохранить как шаблон</h3>
+    <form action="{{ url_for('save_as_template', project_id=project.id) }}" method="POST" style="display: flex; gap: 1rem;">
+        <input type="text" name="name" placeholder="Название шаблона" required style="flex:1; padding: 12px; border: 1px solid #e2e8f0; border-radius: 12px;">
+        <input type="text" name="description" placeholder="Описание" style="flex:2; padding: 12px; border: 1px solid #e2e8f0; border-radius: 12px;">
+        <button type="submit" style="background: #2563eb; color: white; border: none; padding: 12px 24px; border-radius: 12px;">Сохранить</button>
+    </form>
 </div>
 
 <script>
-    document.addEventListener('DOMContentLoaded', function() {
-        let scrollPosition = 0;
-        
-        document.querySelectorAll('.update-percent-btn').forEach(button => {
-            button.addEventListener('click', function() {
-                const stageId = this.dataset.stageId;
-                const input = document.getElementById(`percent-${stageId}`);
-                const percent = input.value;
-                
-                scrollPosition = window.scrollY;
-                
-                fetch(`/update_completion_ajax/{{ project.id }}`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ stage_id: stageId, percent: percent })
-                })
-                .then(response => response.json())
-                .then(data => {
-                    if (data.success) {
-                        const displayDiv = document.querySelector(`.percent-display-${stageId}`);
-                        if (displayDiv) displayDiv.textContent = `${percent}%`;
-                        updateOverallProgress();
-                        updateBudget();
-                        window.scrollTo(0, scrollPosition);
-                    } else {
-                        alert('Ошибка: ' + data.error);
+    // ========== Генерация сметы ==========
+    let currentEstimate = [];
+    function formatNumber(num) { return num.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ' '); }
+    function escapeHtml(text) { const div = document.createElement('div'); div.textContent = text; return div.innerHTML; }
+    function recalcDates() {
+        let stages = [...currentEstimate];
+        const today = new Date(); today.setHours(0,0,0,0);
+        function findStage(name) { return stages.find(s => s.name === name); }
+        let changed = true, iter = 0;
+        while (changed && iter < 20) {
+            changed = false;
+            for (let stage of stages) {
+                if (stage.manualStart) continue;
+                let newStart = null;
+                if (stage.depends_on && stage.depends_on !== '—') {
+                    const depNames = stage.depends_on.split(',').map(s => s.trim());
+                    let maxEnd = null;
+                    for (let dn of depNames) {
+                        const depStage = findStage(dn);
+                        if (depStage && depStage.endDate) {
+                            const depEnd = new Date(depStage.endDate);
+                            if (!maxEnd || depEnd > maxEnd) maxEnd = depEnd;
+                        }
                     }
-                })
-                .catch(error => {
-                    console.error('Error:', error);
-                    alert('Ошибка при обновлении');
-                });
-            });
+                    if (maxEnd) { newStart = new Date(maxEnd); newStart.setDate(newStart.getDate() + 1); }
+                    else { newStart = new Date(today); }
+                } else { newStart = new Date(today); }
+                if (newStart && (!stage.startDate || newStart.getTime() !== stage.startDate.getTime())) {
+                    stage.startDate = newStart;
+                    if (!stage.manualEnd) { const newEnd = new Date(newStart); newEnd.setDate(newStart.getDate() + stage.duration - 1); stage.endDate = newEnd; }
+                    changed = true;
+                }
+            }
+            iter++;
+        }
+        for (let stage of stages) { if (!stage.manualEnd && stage.startDate) { const newEnd = new Date(stage.startDate); newEnd.setDate(stage.startDate.getDate() + stage.duration - 1); stage.endDate = newEnd; } }
+        renderEstimateTable(stages);
+    }
+    function updateDependentDates(changedStageName) {
+        let stages = currentEstimate; let changed = true, iter = 0;
+        while (changed && iter < 20) {
+            changed = false;
+            for (let stage of stages) {
+                if (stage.manualStart) continue;
+                if (stage.depends_on && stage.depends_on !== '—') {
+                    const depNames = stage.depends_on.split(',').map(s => s.trim());
+                    if (depNames.includes(changedStageName)) {
+                        let maxEnd = null;
+                        for (let dn of depNames) {
+                            const depStage = stages.find(s => s.name === dn);
+                            if (depStage && depStage.endDate) { const depEnd = new Date(depStage.endDate); if (!maxEnd || depEnd > maxEnd) maxEnd = depEnd; }
+                        }
+                        if (maxEnd) {
+                            const newStart = new Date(maxEnd); newStart.setDate(newStart.getDate() + 1);
+                            if (!stage.startDate || newStart.getTime() !== stage.startDate.getTime()) {
+                                stage.startDate = newStart;
+                                if (!stage.manualEnd) { const newEnd = new Date(newStart); newEnd.setDate(newStart.getDate() + stage.duration - 1); stage.endDate = newEnd; }
+                                changed = true;
+                            }
+                        }
+                    }
+                }
+            }
+            iter++;
+        }
+        renderEstimateTable(stages);
+    }
+    function renderEstimateTable(stages) {
+        const tbody = document.getElementById('estimate-tbody'); tbody.innerHTML = ''; let total = 0;
+        stages.forEach((stage, idx) => {
+            const row = tbody.insertRow();
+            row.insertCell(0).innerHTML = `<strong>${escapeHtml(stage.name)}</strong>`;
+            const durCell = row.insertCell(1); const durInput = document.createElement('input'); durInput.type = 'number'; durInput.value = stage.duration; durInput.min = 1; durInput.style.width = '70px';
+            durInput.addEventListener('change', (e) => { let newDur = parseInt(e.target.value); if (isNaN(newDur) || newDur < 1) newDur = 1; stage.duration = newDur; if (!stage.manualEnd && stage.startDate) { const newEnd = new Date(stage.startDate); newEnd.setDate(stage.startDate.getDate() + newDur - 1); stage.endDate = newEnd; } updateDependentDates(stage.name); });
+            durCell.appendChild(durInput); durCell.appendChild(document.createTextNode(' дн.'));
+            row.insertCell(2).textContent = stage.depends_on || '—';
+            row.insertCell(3).textContent = stage.resources || '—';
+            const startCell = row.insertCell(4); const startInput = document.createElement('input'); startInput.type = 'date';
+            if (stage.startDate) { const d = stage.startDate; startInput.value = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`; }
+            startInput.addEventListener('change', (e) => { const newStart = new Date(e.target.value); if (!isNaN(newStart)) { stage.startDate = newStart; stage.manualStart = true; if (!stage.manualEnd) { const newEnd = new Date(newStart); newEnd.setDate(newStart.getDate() + stage.duration - 1); stage.endDate = newEnd; } updateDependentDates(stage.name); } });
+            startCell.appendChild(startInput);
+            const endCell = row.insertCell(5); const endInput = document.createElement('input'); endInput.type = 'date';
+            if (stage.endDate) { const d = stage.endDate; endInput.value = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`; }
+            endInput.addEventListener('change', (e) => { const newEnd = new Date(e.target.value); if (!isNaN(newEnd)) { stage.endDate = newEnd; stage.manualEnd = true; if (stage.startDate) { const diff = Math.ceil((newEnd - stage.startDate) / (1000*60*60*24)) + 1; if (diff > 0) { stage.duration = diff; durInput.value = stage.duration; } } updateDependentDates(stage.name); } });
+            endCell.appendChild(endInput);
+            row.insertCell(6).textContent = formatNumber(stage.budget) + ' ₽'; total += stage.budget;
+            const chkCell = row.insertCell(7); const chk = document.createElement('input'); chk.type = 'checkbox'; chk.checked = true; chk.dataset.index = idx; chk.addEventListener('change', updateEstimateTotal); chkCell.appendChild(chk);
         });
-        
-        function updateOverallProgress() {
-            fetch(`/get_project_progress/{{ project.id }}`)
-                .then(response => response.json())
-                .then(data => {
-                    if (data.success) {
-                        const overallElement = document.getElementById('overall-progress');
-                        const progressBar = document.getElementById('progress-bar');
-                        if (overallElement) overallElement.textContent = data.overall_progress + '%';
-                        if (progressBar) progressBar.style.width = data.overall_progress + '%';
-                    }
-                });
+        document.getElementById('estimate-total').textContent = formatNumber(total) + ' ₽'; window.estimateStages = stages;
+    }
+    function updateEstimateTotal() {
+        let total = 0; document.querySelectorAll('#estimate-tbody input[type="checkbox"]').forEach((cb, idx) => { if (cb.checked && window.estimateStages && window.estimateStages[idx]) total += window.estimateStages[idx].budget; });
+        document.getElementById('estimate-total').textContent = formatNumber(total) + ' ₽';
+    }
+    document.getElementById('estimate-form').addEventListener('submit', async function(e) {
+        e.preventDefault(); const budget = parseInt(document.getElementById('budget-input').value); const quality = document.getElementById('quality').value; const houseArea = parseInt(document.getElementById('house-area').value) || 100; const landArea = parseInt(document.getElementById('land-area').value) || 600;
+        if (!budget || budget < 50000) { alert('Бюджет должен быть не менее 50 000 рублей'); return; }
+        const btn = this.querySelector('button[type="submit"]'); const origText = btn.textContent; btn.textContent = 'Генерация...'; btn.disabled = true;
+        try {
+            const resp = await fetch('/api/generate_estimate_by_budget', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ budget, quality, house_area: houseArea, land_area: landArea }) });
+            const data = await resp.json();
+            if (data.success && data.stages && data.stages.length > 0) {
+                const today = new Date(); today.setHours(0,0,0,0);
+                currentEstimate = data.stages.map(s => { const start = new Date(today); const end = new Date(today); end.setDate(today.getDate() + s.duration - 1); return { ...s, startDate: start, endDate: end, manualStart: false, manualEnd: false }; });
+                recalcDates(); document.getElementById('estimate-result').style.display = 'block'; document.getElementById('estimate-result').scrollIntoView({behavior: 'smooth'});
+            } else { alert('Ошибка: ' + (data.error || 'Не удалось сгенерировать смету')); }
+        } catch (err) { console.error(err); alert('Ошибка при обращении к серверу'); }
+        finally { btn.textContent = origText; btn.disabled = false; }
+    });
+    document.getElementById('apply-estimate-btn').addEventListener('click', async function() {
+        const selected = []; document.querySelectorAll('#estimate-tbody input[type="checkbox"]:checked').forEach(cb => { const idx = parseInt(cb.dataset.index); if (window.estimateStages && window.estimateStages[idx]) selected.push(window.estimateStages[idx]); });
+        if (selected.length === 0) { alert('Выберите хотя бы один этап'); return; }
+        this.disabled = true; this.textContent = 'Добавление...';
+        try {
+            const resp = await fetch(`/api/add_estimate_stages/{{ project.id }}`, { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ stages: selected }) });
+            const data = await resp.json();
+            if (data.success) { alert(`Добавлено ${data.count} этапов!`); location.reload(); }
+            else { alert('Ошибка: ' + data.error); }
+        } catch (err) { alert('Ошибка при добавлении'); }
+        finally { this.disabled = false; this.textContent = 'Добавить этапы в проект'; }
+    });
+    document.getElementById('cancel-estimate-btn').addEventListener('click', function() { document.getElementById('estimate-result').style.display = 'none'; });
+
+    // ========== Управление этапами ==========
+    function refreshTableDates(dates) {
+        document.querySelectorAll('#stages-table tr').forEach(row => {
+            const stageId = row.dataset.stageId; if (dates[stageId]) { const start = new Date(dates[stageId][0]); const end = new Date(dates[stageId][1]); row.cells[4].querySelector('input').value = start.toISOString().split('T')[0]; row.cells[5].querySelector('input').value = end.toISOString().split('T')[0]; row.dataset.endDate = dates[stageId][1].split('T')[0]; }
+        });
+        highlightUpcomingStages();
+    }
+    async function updateBudgetSummary() {
+        const resp = await fetch(`/get_project_budget/{{ project.id }}`);
+        const data = await resp.json();
+        if (data.success) {
+            document.getElementById('total-planned').textContent = formatNumber(data.total_planned) + ' ₽';
+            document.getElementById('total-actual').textContent = formatNumber(data.total_actual) + ' ₽';
+            const diff = data.total_actual - data.total_planned;
+            const diffEl = document.getElementById('budget-diff');
+            diffEl.textContent = (diff > 0 ? '↑ ' : (diff < 0 ? '↓ ' : '')) + formatNumber(Math.abs(diff)) + ' ₽';
+            diffEl.style.color = diff > 0 ? '#ef4444' : (diff < 0 ? '#10b981' : '#64748b');
         }
-        
-        function updateBudget() {
-            fetch(`/get_project_budget/{{ project.id }}`)
-                .then(response => response.json())
-                .then(data => {
-                    if (data.success) {
-                        const plannedElement = document.getElementById('total-planned');
-                        const actualElement = document.getElementById('total-actual');
-                        const diffElement = document.getElementById('budget-diff');
-                        const usageElement = document.getElementById('budget-usage');
-                        
-                        if (plannedElement) plannedElement.textContent = data.total_planned.toLocaleString() + ' ₽';
-                        if (actualElement) actualElement.textContent = data.total_actual.toLocaleString() + ' ₽';
-                        
-                        if (diffElement) {
-                            const diff = data.total_actual - data.total_planned;
-                            const diffColor = diff > 0 ? '#ef4444' : (diff < 0 ? '#10b981' : '#64748b');
-                            const diffSymbol = diff > 0 ? '↑' : (diff < 0 ? '↓' : '');
-                            diffElement.textContent = `${diffSymbol} ${Math.abs(diff).toLocaleString()} ₽`;
-                            diffElement.style.color = diffColor;
-                        }
-                        
-                        if (usageElement && data.total_planned > 0) {
-                            const usage = (data.total_actual / data.total_planned * 100).toFixed(1);
-                            usageElement.textContent = usage + '%';
-                        }
-                    }
-                });
-        }
-        
-        document.querySelectorAll('.percent-input').forEach(input => {
-            input.addEventListener('keypress', function(e) {
-                if (e.key === 'Enter') {
-                    const button = document.querySelector(`.update-percent-btn[data-stage-id="${this.dataset.stageId}"]`);
-                    if (button) button.click();
+    }
+    function updateBudgetAndProgress() {
+        Promise.all([ fetch(`/get_project_budget/{{ project.id }}`).then(r => r.json()), fetch(`/get_project_progress/{{ project.id }}`).then(r => r.json()) ])
+            .then(([budgetData, progressData]) => {
+                if (budgetData.success) {
+                    document.getElementById('total-planned').textContent = formatNumber(budgetData.total_planned) + ' ₽';
+                    document.getElementById('total-actual').textContent = formatNumber(budgetData.total_actual) + ' ₽';
+                    const diff = budgetData.total_actual - budgetData.total_planned;
+                    const diffEl = document.getElementById('budget-diff');
+                    diffEl.textContent = (diff > 0 ? '↑ ' : (diff < 0 ? '↓ ' : '')) + formatNumber(Math.abs(diff)) + ' ₽';
+                    diffEl.style.color = diff > 0 ? '#ef4444' : (diff < 0 ? '#10b981' : '#64748b');
+                }
+                if (progressData.success) {
+                    document.getElementById('overall-progress').textContent = progressData.overall_progress + '%';
+                    document.getElementById('progress-bar').style.width = progressData.overall_progress + '%';
                 }
             });
+    }
+    function updateForecast() {
+        fetch(`/get_project_forecast/{{ project.id }}`).then(r => r.json()).then(data => {
+            if (data.success && data.predicted_end) {
+                const endDate = new Date(data.predicted_end); const dev = data.deviation;
+                let html = endDate.toLocaleDateString('ru-RU');
+                if (dev > 0) html += ' <span style="color:#10b981;">опережение ' + dev + ' дн.</span>';
+                else if (dev < 0) html += ' <span style="color:#ef4444;">отставание ' + (-dev) + ' дн.</span>';
+                else html += ' <span style="color:#64748b;">по плану</span>';
+                document.querySelector('#forecast-text').innerHTML = html;
+            }
+        });
+    }
+    function highlightUpcomingStages() {
+        const today = new Date(); today.setHours(0,0,0,0); const weekLater = new Date(today); weekLater.setDate(today.getDate() + 7);
+        document.querySelectorAll('#stages-table tr').forEach(row => {
+            const endDateStr = row.dataset.endDate; const percent = parseInt(row.dataset.percent) || 0;
+            if (!endDateStr || percent >= 100) { row.style.backgroundColor = ''; return; }
+            const endDate = new Date(endDateStr); endDate.setHours(0,0,0,0);
+            row.style.backgroundColor = (endDate >= today && endDate <= weekLater) ? '#fef9c3' : '';
+        });
+    }
+    // Обработчики изменения дат с пересчётом зависимостей
+    document.querySelectorAll('.stage-start-input, .stage-end-input').forEach(input => {
+        input.addEventListener('change', async function() {
+            const stageId = this.dataset.stageId;
+            const row = document.querySelector(`tr[data-stage-id="${stageId}"]`);
+            if (!row) return;
+            const startInput = row.querySelector('.stage-start-input');
+            const endInput = row.querySelector('.stage-end-input');
+            const newStart = startInput.value;
+            const newEnd = endInput.value;
+            if (!newStart || !newEnd) return;
+            try {
+                const resp = await fetch(`/project/{{ project.id }}/recalculate_schedule`, {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({
+                        stages: [{ id: parseInt(stageId), start: newStart, end: newEnd }],
+                        full_recalc: false
+                    })
+                });
+                const data = await resp.json();
+                if (data.success) {
+                    document.querySelectorAll('#stages-table tr').forEach(r => {
+                        const id = r.dataset.stageId;
+                        if (data.dates[id]) {
+                            const start = data.dates[id][0].split('T')[0];
+                            const end = data.dates[id][1].split('T')[0];
+                            r.querySelector('.stage-start-input').value = start;
+                            r.querySelector('.stage-end-input').value = end;
+                            r.dataset.endDate = end;
+                        }
+                    });
+                    highlightUpcomingStages();
+                    updateForecast();
+                } else {
+                    alert('Ошибка пересчёта: ' + (data.error || 'Неизвестная ошибка'));
+                }
+            } catch (err) {
+                alert('Ошибка соединения с сервером');
+            }
         });
     });
-</script>
+    // Редактирование бюджета
+    document.querySelectorAll('.budget-cell').forEach(cell => {
+        const displaySpan = cell.querySelector('.budget-display');
+        const editDiv = cell.querySelector('.budget-edit');
+        const materialInput = cell.querySelector('.edit-material');
+        const laborInput = cell.querySelector('.edit-labor');
+        const saveBtn = cell.querySelector('.save-budget-btn');
+        const cancelBtn = cell.querySelector('.cancel-budget-btn');
+        const stageId = cell.dataset.stageId;
 
+        displaySpan.addEventListener('click', () => {
+            displaySpan.style.display = 'none';
+            editDiv.style.display = 'block';
+            materialInput.focus();
+        });
+        cancelBtn.addEventListener('click', () => {
+            displaySpan.style.display = 'inline';
+            editDiv.style.display = 'none';
+        });
+        saveBtn.addEventListener('click', async () => {
+            const newMaterial = parseFloat(materialInput.value) || 0;
+            const newLabor = parseFloat(laborInput.value) || 0;
+            const resp = await fetch(`/project/{{ project.id }}/update_stage_budget/${stageId}`, {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({ planned_material_cost: newMaterial, planned_labor_cost: newLabor })
+            });
+            const data = await resp.json();
+            if (data.success) {
+                location.reload();
+            } else {
+                alert('Ошибка: ' + data.error);
+            }
+        });
+    });
+    document.querySelectorAll('.update-percent-btn').forEach(btn => {
+        btn.addEventListener('click', function() {
+            const stageId = this.dataset.stageId; const percent = document.querySelector(`.percent-input[data-stage-id="${stageId}"]`).value;
+            fetch(`/update_completion_ajax/{{ project.id }}`, { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({stage_id: stageId, percent: percent}) })
+                .then(r => r.json()).then(data => {
+                    if (data.success) {
+                        document.querySelector(`.percent-display-${stageId}`).textContent = percent + '%';
+                        const row = document.querySelector(`tr[data-stage-id="${stageId}"]`); if (row) row.dataset.percent = percent;
+                        updateBudgetAndProgress(); updateForecast(); highlightUpcomingStages();
+                    }
+                });
+        });
+    });
+    document.querySelectorAll('.delete-stage-btn').forEach(btn => {
+        btn.addEventListener('click', function() {
+            if (!confirm('Удалить этап?')) return;
+            const stageId = this.dataset.stageId;
+            fetch(`/project/{{ project.id }}/delete_stage/${stageId}`, {method: 'DELETE'}).then(r => r.json()).then(data => { if (data.success) location.reload(); });
+        });
+    });
+    document.getElementById('show-add-stage-form').addEventListener('click', () => document.getElementById('add-stage-form').style.display = 'block');
+    document.getElementById('cancel-add').addEventListener('click', () => document.getElementById('add-stage-form').style.display = 'none');
+    document.getElementById('stage-form').addEventListener('submit', function(e) {
+        e.preventDefault(); const formData = new FormData(this); const data = Object.fromEntries(formData.entries()); data.depends = formData.getAll('depends'); data.resources = formData.getAll('resources');
+        fetch(`/project/{{ project.id }}/add_stage`, { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(data) })
+            .then(r => r.json()).then(data => { if (data.success) location.reload(); else alert('Ошибка: ' + data.error); });
+    });
+    document.querySelectorAll('.edit-stage-btn').forEach(btn => {
+        btn.addEventListener('click', function() {
+            const stageId = this.dataset.stageId; const row = document.querySelector(`tr[data-stage-id="${stageId}"]`);
+            const name = prompt('Название этапа', row.cells[0].textContent.trim()); if (!name) return;
+            const duration = prompt('Длительность (дни)', parseInt(row.cells[1].textContent)); if (!duration) return;
+            fetch(`/project/{{ project.id }}/edit_stage/${stageId}`, { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ name, duration, planned_material_cost:0, planned_labor_cost:0, depends:[], resources:[] }) })
+                .then(r => r.json()).then(data => { if (data.success) location.reload(); else alert('Ошибка: ' + data.error); });
+        });
+    });
+    highlightUpcomingStages(); updateForecast();
+</script>
 <style>
-    .card {
-        background: white;
-        border-radius: 12px;
-        border: 1px solid #e2e8f0;
-        padding: 1rem;
-        transition: box-shadow 0.2s;
+    .budget-cell {
+        position: relative;
     }
-    .card:hover {
-        box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1);
+    .budget-cell .tooltip-content {
+        visibility: hidden;
+        background: #1e293b;
+        color: white;
+        text-align: left;
+        padding: 8px 12px;
+        border-radius: 8px;
+        position: absolute;
+        z-index: 10;
+        bottom: 125%;
+        left: 50%;
+        transform: translateX(-50%);
+        white-space: nowrap;
+        font-size: 0.8rem;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+        pointer-events: none;
     }
-    .progress-container {
-        background: #e2e8f0;
-        height: 8px;
-        border-radius: 4px;
-        overflow: hidden;
-    }
-    .progress-bar {
-        background: #3b82f6;
-        height: 100%;
-        border-radius: 4px;
-        transition: width 0.3s;
-    }
-    .budget-summary {
-        background: linear-gradient(135deg, #f8fafc 0%, #ffffff 100%);
-        border: 1px solid #e2e8f0;
-        border-radius: 12px;
-        padding: 1.25rem;
-        margin: 1rem 0;
-    }
-    .budget-stats {
-        display: flex;
-        gap: 2rem;
-        flex-wrap: wrap;
-    }
-    .budget-item {
-        flex: 1;
-        min-width: 150px;
-    }
-    .budget-label {
-        font-size: 0.75rem;
-        text-transform: uppercase;
-        letter-spacing: 0.5px;
-        color: #64748b;
-    }
-    .budget-value {
-        font-size: 1.5rem;
-        font-weight: 700;
-        color: #0f172a;
+    .budget-cell:hover .tooltip-content {
+        visibility: visible;
     }
 </style>
-
 {% endblock %}

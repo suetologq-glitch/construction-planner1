@@ -13,12 +13,27 @@ class User(UserMixin, db.Model):
     role = db.Column(db.String(50), default='user')
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     projects = db.relationship('Project', backref='owner', lazy=True, cascade='all, delete-orphan')
+    templates = db.relationship('ProjectTemplate', backref='owner', lazy=True, cascade='all, delete-orphan')
+    notifications = db.relationship('Notification', backref='user', lazy=True, cascade='all, delete-orphan')
+    team_memberships = db.relationship('ProjectTeam', backref='user', lazy=True, cascade='all, delete-orphan')
     
     def set_password(self, password):
         self.password_hash = generate_password_hash(password)
     
     def check_password(self, password):
         return check_password_hash(self.password_hash, password)
+    
+    def is_admin(self):
+        return self.role == 'admin'
+    
+    def is_manager(self):
+        return self.role in ('admin', 'manager')
+    
+    def is_foreman(self):
+        return self.role in ('admin', 'manager', 'foreman')
+    
+    def is_supplier(self):
+        return self.role in ('admin', 'manager', 'supplier')
 
 
 class Project(db.Model):
@@ -29,11 +44,21 @@ class Project(db.Model):
     latitude = db.Column(db.Float, default=55.751244)
     longitude = db.Column(db.Float, default=37.618423)
     address = db.Column(db.String(300), nullable=True)
+    
     stages = db.relationship('Stage', backref='project', lazy=True, cascade='all, delete-orphan')
     photos = db.relationship('Photo', backref='project', lazy=True, cascade='all, delete-orphan')
     purchase_orders = db.relationship('PurchaseOrder', backref='project', lazy=True, cascade='all, delete-orphan')
     acts = db.relationship('Act', backref='project', lazy=True, cascade='all, delete-orphan')
     contracts = db.relationship('Contract', backref='project', lazy=True, cascade='all, delete-orphan')
+    team = db.relationship('ProjectTeam', backref='project', lazy=True, cascade='all, delete-orphan')
+
+
+class ProjectTeam(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    project_id = db.Column(db.Integer, db.ForeignKey('project.id'), nullable=False)
+    user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
+    role = db.Column(db.String(50), default='viewer')
+    __table_args__ = (db.UniqueConstraint('project_id', 'user_id', name='unique_project_user'),)
 
 
 class Stage(db.Model):
@@ -152,7 +177,6 @@ class ActItem(db.Model):
 class Contract(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     project_id = db.Column(db.Integer, db.ForeignKey('project.id'), nullable=False)
-    
     contract_number = db.Column(db.String(50), nullable=False, unique=True)
     contract_date = db.Column(db.Date, nullable=False)
     contractor_name = db.Column(db.String(200), nullable=False)
@@ -194,3 +218,22 @@ class ContractWorkItem(db.Model):
     quantity = db.Column(db.Float, default=0.0)
     unit_price = db.Column(db.Float, default=0.0)
     total_price = db.Column(db.Float, default=0.0)
+
+
+class ProjectTemplate(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
+    name = db.Column(db.String(100), nullable=False)
+    description = db.Column(db.Text, nullable=True)
+    stages_data = db.Column(db.Text, nullable=False)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+
+class Notification(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
+    title = db.Column(db.String(200), nullable=False)
+    message = db.Column(db.Text, nullable=False)
+    link = db.Column(db.String(500), nullable=True)
+    is_read = db.Column(db.Boolean, default=False)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)

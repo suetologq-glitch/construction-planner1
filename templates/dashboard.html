@@ -1,149 +1,66 @@
 {% extends "base.html" %}
 {% block content %}
-<h1>📊 Дашборд проектов</h1>
+<h1 style="font-size: 2rem; font-weight: 600; margin-bottom: 2rem;">Дашборд</h1>
 
-<!-- Выбор проекта для погоды -->
-<div class="card" style="margin-bottom: 1rem;">
-    <h3 style="margin-top:0;">🌍 Погода на объекте</h3>
-    <form method="get" action="{{ url_for('dashboard') }}" style="padding:0; margin:0;">
-        <select name="project_id" onchange="this.form.submit()" style="width: auto; min-width: 250px;">
-            <option value="">-- Выберите объект --</option>
-            {% for project in projects %}
-                <option value="{{ project.id }}" {% if selected_project and selected_project.id == project.id %}selected{% endif %}>
-                    {{ project.name }} {% if project.address %} ({{ project.address[:30] }}){% endif %}
-                </option>
+<div style="display: grid; grid-template-columns: 1fr 1fr; gap: 2rem; margin-bottom: 2rem;">
+    <div>
+        <label style="display: block; margin-bottom: 8px; font-weight: 500;">Выберите проект</label>
+        <select id="project-select" style="width: 100%; padding: 14px; border: 1px solid #e2e8f0; border-radius: 12px;">
+            <option value="">Все проекты</option>
+            {% for p in projects %}
+            <option value="{{ p.id }}" {% if selected_project and selected_project.id == p.id %}selected{% endif %}>{{ p.name }}</option>
             {% endfor %}
         </select>
-    </form>
+    </div>
 </div>
 
-<!-- Блок погоды -->
+<script>
+    document.getElementById('project-select').addEventListener('change', function() {
+        const pid = this.value;
+        window.location.href = pid ? `/dashboard?project_id=${pid}` : '/dashboard';
+    });
+</script>
+
 {% if weather %}
-<div class="card" style="background: linear-gradient(135deg, #3b82f6 0%, #1e40af 100%); color: white;">
-    <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap;">
-        <div>
-            <h2 style="color: white; margin:0;">🌤️ {{ weather.city }}</h2>
-            <p style="margin: 0.25rem 0 0 0; font-size: 0.8rem;">📍 {{ "%.4f"|format(weather.lat) }}, {{ "%.4f"|format(weather.lon) }}</p>
-            <p style="font-size: 2rem; margin: 0.5rem 0;">{{ weather.temp }}°C</p>
-            <p style="margin: 0;">{{ weather.description }}</p>
-        </div>
-        <div style="text-align: center;">
-            <img src="https://openweathermap.org/img/wn/{{ weather.icon }}@2x.png" alt="weather icon" style="width: 80px;">
-            <p>💨 {{ weather.wind_speed }} м/с</p>
-            <p>💧 {{ weather.humidity }}%</p>
-            <p>🌡️ Ощущается {{ weather.feels_like }}°C</p>
-        </div>
+<div style="background: linear-gradient(145deg, #1e293b, #0f172a); border-radius: 20px; padding: 1.5rem; margin-bottom: 2rem; color: white;">
+    <div style="display: flex; align-items: center; gap: 12px;">
+        <i class="fas fa-cloud-sun" style="font-size: 2rem;"></i>
+        <span style="font-size: 1.2rem;">{{ weather.city }}</span>
     </div>
-    <div style="margin-top: 0.5rem; font-size: 0.8rem; opacity: 0.8;">
-        ⚠️ Для работ, зависящих от погоды (фундамент, кровля, фасад), учитывайте прогноз
+    <div style="display: flex; align-items: baseline; gap: 20px; margin-top: 10px;">
+        <span style="font-size: 2.5rem; font-weight: 600;">{{ weather.temp }}°C</span>
+        <span>Ощущается {{ weather.feels_like }}°C</span>
     </div>
-</div>
-
-<!-- Предупреждения о погоде -->
-{% if weather.temp < 0 %}
-<div class="card" style="background: #e0f2fe; border-color: #0284c7;">
-    <p style="margin:0; color:#075985;">❄️ <strong>Внимание!</strong> Температура ниже нуля. Возможны задержки работ, требующих бетонирования и штукатурки.</p>
-</div>
-{% elif weather.temp > 30 %}
-<div class="card" style="background: #fed7aa; border-color: #ea580c;">
-    <p style="margin:0; color:#9a3412;">🔥 <strong>Внимание!</strong> Высокая температура. Рекомендуется перенести работы на утренние/вечерние часы.</p>
-</div>
-{% elif 'дождь' in weather.description or 'ливень' in weather.description %}
-<div class="card" style="background: #cbd5e1; border-color: #475569;">
-    <p style="margin:0; color:#1e293b;">🌧️ <strong>Внимание!</strong> Ожидаются осадки. Проверьте укрытие материалов и гидроизоляцию.</p>
-</div>
-{% endif %}
-{% else %}
-<div class="card" style="background: #f1f5f9;">
-    <p style="margin:0; color:#475569;">🌍 <strong>Выберите объект</strong>, чтобы увидеть погоду на его месте.</p>
+    <div style="margin-top: 8px;">{{ weather.description }}</div>
 </div>
 {% endif %}
 
-<!-- Блок уведомлений о просрочках -->
 {% if overdue_stages %}
-<div class="card" style="background: #fee2e2; border-color: #ef4444;">
-    <h2 style="color: #991b1b; margin-top:0;">⚠️ Внимание! Просроченные этапы</h2>
-    <div style="max-height: 300px; overflow-y: auto;">
-        <table style="margin-bottom:0;">
-            <thead>
-                <tr style="background:#f1f5f9;">
-                    <th>Проект</th>
-                    <th>Этап</th>
-                    <th>Плановая дата</th>
-                    <th>Просрочка</th>
-                    <th>Прогресс</th>
-                    <th>Действие</th>
-                 </tr>
-            </thead>
-            <tbody>
-                {% for item in overdue_stages %}
-                <tr style="background: white;">
-                    <td><strong>{{ item.project.name }}</strong></td>
-                    <td>{{ item.stage.name }}</td>
-                    <td>{{ item.planned_end.strftime('%d.%m.%Y') }}</td>
-                    <td style="color:#ef4444; font-weight:bold;">{{ item.days_overdue }} дн.</td>
-                    <td>{{ item.stage.percent_complete }}%</td>
-                    <td><a href="{{ url_for('project_view', project_id=item.project.id) }}">Перейти</a></td>
-                </tr>
-                {% endfor %}
-            </tbody>
-        </table>
-    </div>
+<div style="background: #fef2f2; border-left: 6px solid #ef4444; border-radius: 16px; padding: 1.5rem; margin-bottom: 2rem;">
+    <h3 style="margin-bottom: 1rem; color: #991b1b;">Просроченные этапы</h3>
+    <ul style="margin-left: 1.5rem;">
+        {% for item in overdue_stages %}
+        <li><strong>{{ item.stage.name }}</strong> ({{ item.project.name }}) — {{ item.days_overdue }} дн.</li>
+        {% endfor %}
+    </ul>
 </div>
 {% endif %}
 
-{% if stats %}
+<div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 1.5rem;">
     {% for stat in stats %}
-    <div class="card" style="margin-bottom:1.5rem;">
-        <h2 style="margin-top:0;">
-            <a href="{{ url_for('project_view', project_id=stat.project.id) }}">{{ stat.project.name }}</a>
-            {% if stat.delayed_stages > 0 %}
-                <span style="background:#ef4444; color:white; font-size:0.7rem; padding:2px 8px; border-radius:12px; margin-left:10px;">
-                    ⚠️ {{ stat.delayed_stages }} просрочено
-                </span>
-            {% endif %}
-        </h2>
-        <p>Прогресс: {{ stat.progress }}% ({{ stat.completed_stages }}/{{ stat.total_stages }} этапов)</p>
-        
-        <div style="background:#e0e0e0; height:25px; width:100%; border-radius:12px; overflow:hidden; margin:10px 0;">
-            <div style="background:#4CAF50; width:{{ stat.progress }}%; height:25px; text-align:center; line-height:25px; color:white; font-size:14px;">
-                {% if stat.progress > 0 %}{{ stat.progress }}%{% endif %}
+    <div style="background: white; border-radius: 20px; padding: 1.5rem; box-shadow: 0 4px 12px rgba(0,0,0,0.02);">
+        <h3 style="margin-bottom: 1rem;">{{ stat.project.name }}</h3>
+        <div style="margin-bottom: 12px;">
+            <span>Прогресс: {{ stat.progress }}%</span>
+            <div style="background: #e2e8f0; height: 6px; border-radius: 3px; margin-top: 6px;">
+                <div style="background: #2563eb; height: 6px; border-radius: 3px; width: {{ stat.progress }}%;"></div>
             </div>
         </div>
-        
-        <div class="budget-summary" style="margin-top:1rem;">
-            <div class="budget-stats">
-                <div class="budget-item">
-                    <div class="budget-label">Плановый бюджет</div>
-                    <div class="budget-value">{{ "%.2f"|format(stat.budget.planned) }} ₽</div>
-                </div>
-                <div class="budget-item">
-                    <div class="budget-label">Фактические затраты</div>
-                    <div class="budget-value">{{ "%.2f"|format(stat.budget.actual) }} ₽</div>
-                </div>
-                <div class="budget-item">
-                    <div class="budget-label">Отклонение</div>
-                    {% set diff = stat.budget.diff %}
-                    <div class="budget-value {% if diff > 0 %}budget-diff-positive{% elif diff < 0 %}budget-diff-negative{% endif %}">
-                        {% if diff > 0 %}↑ {{ "%.2f"|format(diff) }} ₽
-                        {% elif diff < 0 %}↓ {{ "%.2f"|format(0 - diff) }} ₽
-                        {% else %}0 ₽{% endif %}
-                    </div>
-                </div>
-            </div>
-        </div>
-        
-        {% if stat.delayed_stages > 0 %}
-            <p style="color:#ef4444; margin-top:0.75rem;">⚠️ {{ stat.delayed_stages }} этапов просрочено</p>
-        {% else %}
-            <p style="color:#10b981; margin-top:0.75rem;">✅ Все этапы в графике</p>
-        {% endif %}
+        <p>Этапов: {{ stat.completed_stages }}/{{ stat.total_stages }}</p>
+        <p>Просрочено: {{ stat.delayed_stages }}</p>
+        <p>Бюджет: план {{ "{:,.0f}".format(stat.budget.planned).replace(',', ' ') }} ₽ / факт {{ "{:,.0f}".format(stat.budget.actual).replace(',', ' ') }} ₽</p>
+        <a href="{{ url_for('project_view', project_id=stat.project.id) }}" style="display: inline-block; margin-top: 12px; color: #2563eb;">Открыть →</a>
     </div>
     {% endfor %}
-{% else %}
-<div class="card" style="text-align:center; color:#64748b;">
-    <p>📭 Нет проектов</p>
-    <p style="font-size:0.875rem; margin-top:0.5rem;">Создайте проект на главной странице</p>
 </div>
-{% endif %}
 {% endblock %}

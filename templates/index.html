@@ -1,45 +1,68 @@
 {% extends "base.html" %}
 {% block content %}
-<h1>🏗️ Мои проекты</h1>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
 
-{% if projects %}
-<ul class="projects-list">
+<h1 style="font-size: 2rem; font-weight: 600; margin-bottom: 2rem;">Мои проекты</h1>
+
+<div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 1.5rem; margin-bottom: 2rem;">
     {% for p in projects %}
-    <li>
-        <a href="{{ url_for('project_view', project_id=p.id) }}">{{ p.name }}</a>
-        <a href="{{ url_for('delete_project', project_id=p.id) }}" 
-           onclick="return confirm('Удалить проект?')" 
-           style="color:#ef4444; font-size:0.875rem;">Удалить</a>
-    </li>
-    {% endfor %}
-</ul>
-{% else %}
-<div class="card" style="text-align:center; color:#64748b;">
-    <p>📭 Пока нет ни одного проекта</p>
-    <p style="font-size:0.875rem; margin-top:0.5rem;">Создайте первый проект ниже</p>
-</div>
-{% endif %}
-
-<div class="card">
-    <h2 style="margin-top:0;">➕ Создать новый проект</h2>
-    <form action="{{ url_for('add_project') }}" method="post" style="padding:0; margin:0;">
-        <label>Название проекта:</label>
-        <input type="text" name="name" placeholder="Например: Дом №1" required>
-        
-        <label>Дата начала:</label>
-        <input type="date" name="start_date" required>
-        
-        <label>Адрес объекта (необязательно):</label>
-        <input type="text" name="address" placeholder="г. Москва, ул. Примерная, д. 1">
-        
-        <label>Координаты (или оставьте поля пустыми для Москвы):</label>
-        <div style="display: flex; gap: 1rem;">
-            <input type="text" name="latitude" placeholder="Широта (например: 55.751244)" style="flex:1;">
-            <input type="text" name="longitude" placeholder="Долгота (например: 37.618423)" style="flex:1;">
+    <div style="background: white; border-radius: 20px; padding: 1.5rem; box-shadow: 0 4px 12px rgba(0,0,0,0.02); border: 1px solid #f1f5f9;">
+        <div style="display: flex; justify-content: space-between; align-items: flex-start;">
+            <h3 style="font-weight: 600; margin-bottom: 12px;">{{ p.name }}</h3>
+            <div>
+                <a href="{{ url_for('project_team', project_id=p.id) }}" style="color: #64748b; margin-right: 8px;"><i class="fas fa-users"></i></a>
+                <a href="{{ url_for('delete_project', project_id=p.id) }}" onclick="return confirm('Удалить проект?')" style="color: #ef4444;"><i class="fas fa-trash"></i></a>
+            </div>
         </div>
-        <small style="color:#64748b;">💡 Можно найти координаты на maps.google.com</small><br><br>
-        
-        <button type="submit">Создать проект</button>
-    </form>
+        <p style="color: #64748b; margin-bottom: 20px;"><i class="far fa-calendar-alt"></i> {{ p.start_date.strftime('%d.%m.%Y') }}</p>
+        <a href="{{ url_for('project_view', project_id=p.id) }}" style="display: inline-block; background: #2563eb; color: white; padding: 10px 18px; border-radius: 30px; text-decoration: none; font-weight: 500;">Открыть</a>
+    </div>
+    {% endfor %}
 </div>
+
+<div style="display: grid; grid-template-columns: 1fr 1fr; gap: 2rem;">
+    <div style="background: white; border-radius: 20px; padding: 2rem;">
+        <h2 style="margin-bottom: 1.5rem;">Создать новый проект</h2>
+        <form action="{{ url_for('add_project') }}" method="post" style="display: flex; flex-direction: column; gap: 1rem;">
+            <input type="text" name="name" placeholder="Название проекта" required style="padding: 14px; border: 1px solid #e2e8f0; border-radius: 12px;">
+            <input type="date" name="start_date" required style="padding: 14px; border: 1px solid #e2e8f0; border-radius: 12px;">
+            <input type="text" name="address" placeholder="Адрес" style="padding: 14px; border: 1px solid #e2e8f0; border-radius: 12px;">
+            <div style="display: flex; gap: 1rem;">
+                <input type="text" name="latitude" placeholder="Широта" style="flex:1; padding: 14px; border: 1px solid #e2e8f0; border-radius: 12px;">
+                <input type="text" name="longitude" placeholder="Долгота" style="flex:1; padding: 14px; border: 1px solid #e2e8f0; border-radius: 12px;">
+            </div>
+            <button type="submit" style="background: #2563eb; color: white; border: none; padding: 14px; border-radius: 12px; font-weight: 500;">Создать проект</button>
+        </form>
+    </div>
+
+    {% if templates %}
+    <div style="background: white; border-radius: 20px; padding: 2rem;">
+        <h2 style="margin-bottom: 1.5rem;">Создать из шаблона</h2>
+        <form id="template-form" method="post" style="display: flex; flex-direction: column; gap: 1rem;">
+            <select id="template-select" required style="padding: 14px; border: 1px solid #e2e8f0; border-radius: 12px;">
+                <option value="">Выберите шаблон</option>
+                {% for t in templates %}
+                <option value="{{ t.id }}">{{ t.name }}</option>
+                {% endfor %}
+            </select>
+            <input type="text" name="name" placeholder="Название проекта" required style="padding: 14px; border: 1px solid #e2e8f0; border-radius: 12px;">
+            <input type="date" name="start_date" required style="padding: 14px; border: 1px solid #e2e8f0; border-radius: 12px;">
+            <input type="text" name="address" placeholder="Адрес" style="padding: 14px; border: 1px solid #e2e8f0; border-radius: 12px;">
+            <div style="display: flex; gap: 1rem;">
+                <input type="text" name="latitude" placeholder="Широта" style="flex:1; padding: 14px; border: 1px solid #e2e8f0; border-radius: 12px;">
+                <input type="text" name="longitude" placeholder="Долгота" style="flex:1; padding: 14px; border: 1px solid #e2e8f0; border-radius: 12px;">
+            </div>
+            <button type="submit" style="background: #2563eb; color: white; border: none; padding: 14px; border-radius: 12px; font-weight: 500;">Создать из шаблона</button>
+        </form>
+    </div>
+    {% endif %}
+</div>
+
+<script>
+    document.getElementById('template-form')?.addEventListener('submit', function(e) {
+        const templateId = document.getElementById('template-select').value;
+        if (!templateId) { e.preventDefault(); alert('Выберите шаблон'); return; }
+        this.action = '/create_from_template/' + templateId;
+    });
+</script>
 {% endblock %}

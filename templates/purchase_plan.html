@@ -1,111 +1,211 @@
 {% extends "base.html" %}
 {% block content %}
-<h1>📦 План закупок: {{ project.name }}</h1>
-<p style="color:#64748b; margin-bottom:1.5rem;">Автоматически сформированный на основе графика этапов</p>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
 
-<div style="margin-bottom: 1rem;">
-    <a href="{{ url_for('generate_purchase_plan', project_id=project.id) }}" class="card" style="display:inline-block; padding:0.75rem 1.5rem; text-decoration:none; background:#3b82f6; color:white; border-radius:8px;">🔄 Сформировать план закупок</a>
-    <a href="{{ url_for('project_view', project_id=project.id) }}" class="card" style="display:inline-block; padding:0.75rem 1.5rem; text-decoration:none; margin-left:1rem;">← Вернуться к проекту</a>
+<div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 2rem;">
+    <h1 style="font-size: 2rem; font-weight: 600;"><i class="fas fa-boxes" style="margin-right: 12px; color: #2563eb;"></i>План закупок — {{ project.name }}</h1>
+    <div style="display: flex; gap: 1rem;">
+        <a href="{{ url_for('generate_purchase_plan', project_id=project.id) }}" class="btn-primary" style="background: #2563eb; color: white; padding: 12px 20px; border-radius: 12px; text-decoration: none; font-weight: 500;">
+            <i class="fas fa-robot"></i> Сгенерировать
+        </a>
+        <button id="show-add-order-form" class="btn-outline" style="background: white; border: 1px solid #cbd5e1; padding: 12px 20px; border-radius: 12px; font-weight: 500;">
+            <i class="fas fa-plus"></i> Создать вручную
+        </button>
+    </div>
+</div>
+
+<!-- Форма создания заказа -->
+<div id="add-order-form" style="display: none; background: white; border-radius: 20px; padding: 1.5rem; margin-bottom: 2rem; box-shadow: 0 4px 12px rgba(0,0,0,0.02);">
+    <h3 style="margin-bottom: 1.5rem;">Новый заказ</h3>
+    <form method="POST" action="{{ url_for('add_purchase_order', project_id=project.id) }}">
+        <div style="display: grid; gap: 1rem;">
+            <input type="text" name="order_number" placeholder="Номер заказа" required style="padding: 14px; border: 1px solid #e2e8f0; border-radius: 12px;">
+            <input type="text" name="supplier" placeholder="Поставщик" style="padding: 14px; border: 1px solid #e2e8f0; border-radius: 12px;">
+            <input type="date" name="order_date" required style="padding: 14px; border: 1px solid #e2e8f0; border-radius: 12px;">
+            <div style="display: flex; gap: 1rem;">
+                <button type="submit" class="btn-primary" style="background: #2563eb; color: white; border: none; padding: 14px 24px; border-radius: 12px;">Создать</button>
+                <button type="button" id="cancel-add-order" class="btn-outline" style="background: white; border: 1px solid #cbd5e1; padding: 14px 24px; border-radius: 12px;">Отмена</button>
+            </div>
+        </div>
+    </form>
 </div>
 
 {% if purchase_orders %}
     {% for order in purchase_orders %}
-    <div class="card" style="margin-bottom: 1.5rem;">
-        <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap;">
-            <h2 style="margin-top:0;">📋 Заказ №{{ order.order_number }}</h2>
-            <div>
-                {% if order.status == 'pending' %}
-                    <span style="background: #f59e0b; color: white; padding: 4px 12px; border-radius: 20px;">⏳ Ожидает заказа</span>
-                {% elif order.status == 'ordered' %}
-                    <span style="background: #3b82f6; color: white; padding: 4px 12px; border-radius: 20px;">📦 Заказан</span>
-                {% elif order.status == 'delivered' %}
-                    <span style="background: #10b981; color: white; padding: 4px 12px; border-radius: 20px;">✅ Доставлен</span>
-                {% else %}
-                    <span style="background: #ef4444; color: white; padding: 4px 12px; border-radius: 20px;">❌ Отменён</span>
-                {% endif %}
+    <div style="background: white; border-radius: 20px; padding: 1.5rem; margin-bottom: 2rem; box-shadow: 0 4px 12px rgba(0,0,0,0.02);">
+        <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 1rem;">
+            <div style="display: flex; align-items: center; gap: 12px;">
+                <h3 style="font-weight: 600;">Заказ №{{ order.order_number }}</h3>
+                <span class="status-badge" style="background: {% if order.status == 'pending' %}#fef9c3{% elif order.status == 'ordered' %}#bfdbfe{% else %}#bbf7d0{% endif %}; padding: 4px 12px; border-radius: 30px; font-size: 0.8rem;">
+                    {% if order.status == 'pending' %}Ожидается{% elif order.status == 'ordered' %}Заказано{% elif order.status == 'delivered' %}Доставлено{% else %}{{ order.status }}{% endif %}
+                </span>
+            </div>
+            <div style="display: flex; gap: 8px;">
+                <a href="{{ url_for('update_order_status', order_id=order.id, status='ordered') }}" class="btn-icon" style="color: #2563eb;" title="Отметить заказанным"><i class="fas fa-truck"></i></a>
+                <a href="{{ url_for('update_order_status', order_id=order.id, status='delivered') }}" class="btn-icon" style="color: #10b981;" title="Отметить доставленным"><i class="fas fa-check-circle"></i></a>
+                <a href="{{ url_for('delete_order', order_id=order.id) }}" onclick="return confirm('Удалить заказ?')" class="btn-icon" style="color: #ef4444;"><i class="fas fa-trash"></i></a>
             </div>
         </div>
-        
-        <div style="display: flex; gap: 2rem; flex-wrap: wrap; margin-top: 0.5rem;">
-            <div><strong>Поставщик:</strong> {{ order.supplier or 'Не указан' }}</div>
-            <div><strong>Дата заказа:</strong> {{ order.order_date.strftime('%d.%m.%Y') }}</div>
-            {% if order.delivery_date %}
-            <div><strong>План доставки:</strong> {{ order.delivery_date.strftime('%d.%m.%Y') }}</div>
-            {% endif %}
-            <div><strong>Сумма:</strong> {{ "%.2f"|format(order.total_amount) }} ₽</div>
+        <div style="display: flex; gap: 24px; margin-bottom: 16px; color: #475569;">
+            <span><i class="far fa-building"></i> {{ order.supplier or 'не указан' }}</span>
+            <span><i class="far fa-calendar-alt"></i> {{ order.order_date.strftime('%d.%m.%Y') }}</span>
+            <span><strong>Сумма:</strong> {{ "{:,.2f}".format(order.total_amount).replace(',', ' ') }} ₽</span>
         </div>
-        
-        <h3 style="margin: 1rem 0 0.5rem 0;">📋 Состав заказа</h3>
+
+        <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 1rem;">
+            <h4 style="font-weight: 500;">Состав заказа</h4>
+            <button class="show-add-item-form btn-outline" data-order-id="{{ order.id }}" style="background: white; border: 1px solid #cbd5e1; padding: 8px 14px; border-radius: 30px; font-size: 0.85rem;">
+                <i class="fas fa-plus"></i> Добавить позицию
+            </button>
+        </div>
+
+        <!-- Форма добавления позиции (скрыта) -->
+        <div id="add-item-form-{{ order.id }}" class="add-item-form" style="display: none; background: #f8fafc; border-radius: 16px; padding: 1.5rem; margin-bottom: 1.5rem;">
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 1rem;">
+                <select id="stage-select-{{ order.id }}" required style="padding: 10px; border: 1px solid #e2e8f0; border-radius: 10px;">
+                    <option value="">Выберите этап</option>
+                    {% for stage in project.stages %}
+                    <option value="{{ stage.id }}">{{ stage.name }}</option>
+                    {% endfor %}
+                </select>
+                <input type="text" id="material-name-{{ order.id }}" placeholder="Наименование" required style="padding: 10px; border: 1px solid #e2e8f0; border-radius: 10px;">
+                <input type="number" id="quantity-{{ order.id }}" placeholder="Кол-во" step="0.01" value="1" style="padding: 10px; border: 1px solid #e2e8f0; border-radius: 10px;">
+                <input type="text" id="unit-{{ order.id }}" placeholder="Ед. изм." value="шт" style="padding: 10px; border: 1px solid #e2e8f0; border-radius: 10px;">
+                <input type="number" id="unit-price-{{ order.id }}" placeholder="Цена за ед." step="0.01" value="0" style="padding: 10px; border: 1px solid #e2e8f0; border-radius: 10px;">
+            </div>
+            <div style="display: flex; gap: 1rem; margin-top: 1rem;">
+                <button onclick="addItem({{ order.id }})" class="btn-primary" style="background: #2563eb; color: white; border: none; padding: 10px 20px; border-radius: 10px;">Сохранить</button>
+                <button onclick="hideAddItemForm({{ order.id }})" class="btn-outline" style="background: white; border: 1px solid #cbd5e1; padding: 10px 20px; border-radius: 10px;">Отмена</button>
+            </div>
+        </div>
+
+        {% if order.items %}
         <div style="overflow-x: auto;">
-            <table style="width:100%;">
+            <table style="width: 100%; border-collapse: collapse;">
                 <thead>
-                    <tr style="background:#f1f5f9;">
-                        <th style="padding: 8px;">Материал</th>
-                        <th style="padding: 8px;">Количество</th>
-                        <th style="padding: 8px;">Ед. изм.</th>
-                        <th style="padding: 8px;">Цена</th>
-                        <th style="padding: 8px;">Сумма</th>
-                        <th style="padding: 8px;">Этап</th>
-                        <th style="padding: 8px;">Статус</th>
-                       </tr>
-                </thead>
-                <tbody>
-                    {% for item in order.items %}
                     <tr style="border-bottom: 1px solid #e2e8f0;">
-                        <td style="padding: 8px;"><strong>{{ item.material_name }}</strong></td>
-                        <td style="padding: 8px;">{{ item.quantity }}</td>
-                        <td style="padding: 8px;">{{ item.unit }}</td>
-                        <td style="padding: 8px;">{{ "%.2f"|format(item.unit_price) }} ₽</td>
-                        <td style="padding: 8px;">{{ "%.2f"|format(item.total_price) }} ₽</td>
-                        <td style="padding: 8px;">
-                            <a href="{{ url_for('project_view', project_id=project.id) }}">{{ item.stage.name }}</a>
+                        <th style="padding: 0.75rem; text-align: left;">Материал</th>
+                        <th style="padding: 0.75rem; text-align: left;">Этап</th>
+                        <th style="padding: 0.75rem; text-align: left;">Кол-во</th>
+                        <th style="padding: 0.75rem; text-align: left;">Ед.</th>
+                        <th style="padding: 0.75rem; text-align: left;">Цена</th>
+                        <th style="padding: 0.75rem; text-align: left;">Сумма</th>
+                        <th style="padding: 0.75rem; text-align: left;">Статус</th>
+                        <th style="padding: 0.75rem; text-align: left;"></th>
+                    </tr>
+                </thead>
+                <tbody id="items-table-{{ order.id }}">
+                    {% for item in order.items %}
+                    <tr id="item-row-{{ item.id }}" style="border-bottom: 1px solid #f1f5f9;">
+                        <td style="padding: 0.75rem;">{{ item.material_name }}</td>
+                        <td style="padding: 0.75rem;">{{ item.stage.name if item.stage else '—' }}</td>
+                        <td style="padding: 0.75rem;">{{ item.quantity }}</td>
+                        <td style="padding: 0.75rem;">{{ item.unit }}</td>
+                        <td style="padding: 0.75rem;">{{ "%.2f"|format(item.unit_price) }}</td>
+                        <td style="padding: 0.75rem;">{{ "%.2f"|format(item.total_price) }}</td>
+                        <td style="padding: 0.75rem;">
+                            {% if item.status == 'pending' %}Ожидается
+                            {% elif item.status == 'ordered' %}Заказано
+                            {% elif item.status == 'received' %}Получено
+                            {% else %}{{ item.status }}{% endif %}
                         </td>
-                        <td style="padding: 8px;">
-                            {% if item.status == 'pending' %}
-                                <span style="color:#f59e0b;">⏳</span>
-                            {% elif item.status == 'ordered' %}
-                                <span style="color:#3b82f6;">📦</span>
-                            {% elif item.status == 'received' %}
-                                <span style="color:#10b981;">✅</span>
-                            {% endif %}
+                        <td style="padding: 0.75rem;">
+                            <button class="edit-item-btn" data-item-id="{{ item.id }}" data-order-id="{{ order.id }}" style="background: none; border: none; color: #64748b; margin-right: 8px;"><i class="fas fa-pen"></i></button>
+                            <button class="delete-item-btn" data-item-id="{{ item.id }}" data-order-id="{{ order.id }}" style="background: none; border: none; color: #ef4444;"><i class="fas fa-trash"></i></button>
                         </td>
                     </tr>
                     {% endfor %}
                 </tbody>
-                <tfoot>
-                    <tr style="background:#f8fafc;">
-                        <td colspan="4" style="padding: 8px; text-align: right;"><strong>Итого:</strong></td>
-                        <td style="padding: 8px;"><strong>{{ "%.2f"|format(order.total_amount) }} ₽</strong></td>
-                        <td colspan="2"></td>
-                    </tr>
-                </tfoot>
             </table>
         </div>
-        
-        <div style="margin-top: 1rem; display: flex; gap: 0.5rem;">
-            <a href="{{ url_for('update_order_status', order_id=order.id, status='ordered') }}" class="card" style="display:inline-block; padding:0.5rem 1rem; text-decoration:none; background:#3b82f6; color:white; border-radius:6px;">📦 Отметить заказанным</a>
-            <a href="{{ url_for('update_order_status', order_id=order.id, status='delivered') }}" class="card" style="display:inline-block; padding:0.5rem 1rem; text-decoration:none; background:#10b981; color:white; border-radius:6px;">✅ Отметить доставленным</a>
-            <a href="{{ url_for('delete_order', order_id=order.id) }}" onclick="return confirm('Удалить заказ?')" class="card" style="display:inline-block; padding:0.5rem 1rem; text-decoration:none; background:#ef4444; color:white; border-radius:6px;">🗑️ Удалить</a>
-        </div>
+        {% else %}
+        <p style="color: #64748b; text-align: center; padding: 1rem;">Нет позиций</p>
+        {% endif %}
     </div>
     {% endfor %}
 {% else %}
-<div class="card" style="text-align:center;">
-    <p style="font-size:3rem; margin-bottom:0.5rem;">📦</p>
-    <p>Нет сформированных заказов</p>
-    <p style="font-size:0.875rem; color:#64748b;">Нажмите кнопку "Сформировать план закупок", чтобы создать заказы на основе этапов</p>
-</div>
+    <div style="background: white; border-radius: 20px; padding: 3rem; text-align: center; color: #64748b;">
+        <i class="fas fa-box-open" style="font-size: 3rem; margin-bottom: 1rem;"></i>
+        <p>Нет заказов. Сгенерируйте автоматически или создайте вручную.</p>
+    </div>
 {% endif %}
 
-<style>
-    .card {
-        background: white;
-        border-radius: 12px;
-        border: 1px solid #e2e8f0;
-        padding: 1.5rem;
-    }
-    table {
-        border-collapse: collapse;
-    }
-</style>
+<script>
+    document.getElementById('show-add-order-form')?.addEventListener('click', () => {
+        document.getElementById('add-order-form').style.display = 'block';
+    });
+    document.getElementById('cancel-add-order')?.addEventListener('click', () => {
+        document.getElementById('add-order-form').style.display = 'none';
+    });
+
+    document.querySelectorAll('.show-add-item-form').forEach(btn => {
+        btn.addEventListener('click', function() {
+            const orderId = this.dataset.orderId;
+            document.getElementById(`add-item-form-${orderId}`).style.display = 'block';
+        });
+    });
+
+    window.hideAddItemForm = function(orderId) {
+        document.getElementById(`add-item-form-${orderId}`).style.display = 'none';
+    };
+
+    window.addItem = async function(orderId) {
+        const stageSelect = document.getElementById(`stage-select-${orderId}`);
+        const stageId = stageSelect.value;
+        const materialName = document.getElementById(`material-name-${orderId}`).value.trim();
+        const quantity = parseFloat(document.getElementById(`quantity-${orderId}`).value);
+        const unit = document.getElementById(`unit-${orderId}`).value.trim();
+        const unitPrice = parseFloat(document.getElementById(`unit-price-${orderId}`).value);
+
+        if (!stageId || !materialName) {
+            alert('Заполните этап и наименование');
+            return;
+        }
+
+        const resp = await fetch(`/order/${orderId}/add_item`, {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({ stage_id: stageId, material_name: materialName, quantity, unit, unit_price: unitPrice })
+        });
+        const data = await resp.json();
+        if (data.success) location.reload();
+        else alert('Ошибка: ' + data.error);
+    };
+
+    document.querySelectorAll('.delete-item-btn').forEach(btn => {
+        btn.addEventListener('click', async function() {
+            if (!confirm('Удалить позицию?')) return;
+            const itemId = this.dataset.itemId;
+            const resp = await fetch(`/order/item/${itemId}/delete`, { method: 'DELETE' });
+            const data = await resp.json();
+            if (data.success) location.reload();
+            else alert('Ошибка удаления');
+        });
+    });
+
+    document.querySelectorAll('.edit-item-btn').forEach(btn => {
+        btn.addEventListener('click', async function() {
+            const itemId = this.dataset.itemId;
+            const row = document.getElementById(`item-row-${itemId}`);
+            const cells = row.cells;
+            const materialName = prompt('Наименование', cells[0].textContent);
+            if (!materialName) return;
+            const quantity = prompt('Количество', cells[2].textContent);
+            if (quantity === null) return;
+            const unit = prompt('Ед. изм.', cells[3].textContent);
+            if (unit === null) return;
+            const unitPrice = prompt('Цена за ед.', cells[4].textContent);
+            if (unitPrice === null) return;
+
+            const resp = await fetch(`/order/item/${itemId}/update`, {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({ material_name: materialName, quantity: parseFloat(quantity), unit, unit_price: parseFloat(unitPrice) })
+            });
+            const data = await resp.json();
+            if (data.success) location.reload();
+            else alert('Ошибка обновления');
+        });
+    });
+</script>
 {% endblock %}

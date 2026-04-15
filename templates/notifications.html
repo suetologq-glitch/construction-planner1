@@ -1,0 +1,47 @@
+{% extends "base.html" %}
+{% block content %}
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+
+<h1 style="font-size: 2rem; font-weight: 600; margin-bottom: 2rem;"><i class="far fa-bell" style="margin-right: 12px; color: #2563eb;"></i>Уведомления</h1>
+
+{% if notifications %}
+<div style="display: flex; flex-direction: column; gap: 1rem;">
+    {% for n in notifications %}
+    <div style="background: white; border-radius: 20px; padding: 1.5rem; box-shadow: 0 4px 12px rgba(0,0,0,0.02); border: 1px solid #f1f5f9; {% if not n.is_read %}border-left: 6px solid #2563eb;{% endif %}">
+        <div style="display: flex; align-items: flex-start; justify-content: space-between;">
+            <div style="display: flex; gap: 12px;">
+                <div style="background: {% if n.is_read %}#f1f5f9{% else %}#dbeafe{% endif %}; border-radius: 12px; width: 40px; height: 40px; display: flex; align-items: center; justify-content: center;">
+                    <i class="fas fa-{% if 'завершён' in n.title or '100%' in n.message %}check-circle{% elif 'добавлен' in n.title or 'создан' in n.title %}plus-circle{% elif 'удалён' in n.title %}trash-alt{% elif 'дата' in n.title %}calendar-alt{% else %}info-circle{% endif %}" style="color: #2563eb; font-size: 1.2rem;"></i>
+                </div>
+                <div>
+                    <h3 style="font-weight: 600; margin-bottom: 6px; {% if not n.is_read %}color: #1e293b;{% else %}color: #475569;{% endif %}">{{ n.title }}</h3>
+                    <p style="color: #64748b; margin-bottom: 8px;">{{ n.message }}</p>
+                    <span style="font-size: 0.8rem; color: #94a3b8;"><i class="far fa-clock"></i> {{ n.created_at.strftime('%d.%m.%Y %H:%M') }}</span>
+                </div>
+            </div>
+            <div style="display: flex; gap: 8px;">
+                {% if n.link %}
+                <a href="{{ n.link }}" style="background: #f1f5f9; padding: 8px 12px; border-radius: 8px; text-decoration: none; color: #2563eb; font-size: 0.85rem;"><i class="fas fa-arrow-right"></i> Перейти</a>
+                {% endif %}
+                {% if not n.is_read %}
+                <button onclick="markRead({{ n.id }})" style="background: none; border: 1px solid #cbd5e1; padding: 8px 12px; border-radius: 8px; color: #64748b; cursor: pointer; font-size: 0.85rem;"><i class="far fa-check-circle"></i> Прочитано</button>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+    {% endfor %}
+</div>
+{% else %}
+<div style="background: white; border-radius: 20px; padding: 3rem; text-align: center; color: #64748b; box-shadow: 0 4px 12px rgba(0,0,0,0.02);">
+    <i class="far fa-bell-slash" style="font-size: 3rem; margin-bottom: 1rem; color: #94a3b8;"></i>
+    <p>У вас пока нет уведомлений</p>
+</div>
+{% endif %}
+
+<script>
+async function markRead(id) {
+    await fetch('/notifications/read/' + id);
+    location.reload();
+}
+</script>
+{% endblock %}

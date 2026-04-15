@@ -1,46 +1,44 @@
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, date
 from models import Stage, Dependency
 
-def calculate_dates(project, db):
-    """
-    Рассчитывает для всех этапов проекта даты начала и окончания.
-    Если у этапа есть custom_start_date и custom_end_date, использует их.
-    Иначе рассчитывает на основе зависимостей.
-    """
-    stages = Stage.query.filter_by(project_id=project.id).all()
-    if not stages:
-        return {}
+HOLIDAYS = {
+    date(2026, 1, 1), date(2026, 1, 2), date(2026, 1, 7),
+    date(2026, 2, 23), date(2026, 3, 8), date(2026, 5, 1),
+    date(2026, 5, 9), date(2026, 6, 12), date(2026, 11, 4),
+}
 
-    # Проверяем, есть ли этапы с пользовательскими датами
-    custom_dates_exist = any(s.custom_start_date and s.custom_end_date for s in stages)
-    
-    if custom_dates_exist:
-        # Используем даты из Excel
-        result = {}
-        for stage in stages:
-            if stage.custom_start_date and stage.custom_end_date:
-                result[stage.id] = (stage.custom_start_date, stage.custom_end_date)
-            else:
-                # Если даты не заданы, рассчитываем
-                result[stage.id] = (project.start_date, project.start_date + timedelta(days=stage.planned_duration - 1))
-        return result
-    
-    # Иначе стандартный расчёт на основе зависимостей
-    deps = {}
-    for stage in stages:
-        deps[stage.id] = []
-    dependencies = Dependency.query.all()
-    for dep in dependencies:
+def is_workday(d):
+    if d.weekday() >= 5: return False
+    if d in HOLIDAYS: return False
+    return True
+
+def next_workday(d):
+    cur = d
+    while not is_workday(cur):
+        cur += timedelta(days=1)
+    return cur
+
+def add_workdays(start_date, days):
+    if days <= 0: return start_date
+    current = start_date
+    count = 0
+    while count < days:
+        current += timedelta(days=1)
+        if is_workday(current): count += 1
+    return current
+
+def calculate_dates(project, db):
+    stages = Stage.query.filter_by(project_id=project.id).order_by(Stage.id).all()
+    if not stages: return {}
+    deps = {s.id: [] for s in stages}
+    for dep in Dependency.query.all():
         stage = Stage.query.get(dep.stage_id)
         if stage and stage.project_id == project.id:
             deps[dep.stage_id].append(dep.depends_on_stage_id)
-
     from collections import deque
-    in_degree = {stage.id: 0 for stage in stages}
-    for stage_id, preds in deps.items():
-        for p in preds:
-            in_degree[stage_id] += 1
-
+    in_degree = {s.id: 0 for s in stages}
+    for sid, preds in deps.items():
+        for p in preds: in_degree[sid] += 1
     queue = deque([sid for sid, deg in in_degree.items() if deg == 0])
     order = []
     while queue:
@@ -49,46 +47,64 @@ def calculate_dates(project, db):
         for other, preds in deps.items():
             if sid in preds:
                 in_degree[other] -= 1
-                if in_degree[other] == 0:
-                    queue.append(other)
-
-    start = {sid: project.start_date for sid in order}
+                if in_degree[other] == 0: queue.append(other)
+    start = {}
     end = {}
     for sid in order:
-        stage = next((s for s in stages if s.id == sid), None)
-        if not stage:
+        stage = next(s for s in stages if s.id == sid)
+        if stage.percent_complete == 100 and stage.actual_end_date:
+            end[sid] = stage.actual_end_date
+            start[sid] = stage.actual_end_date - timedelta(days=stage.planned_duration - 1)
             continue
-        if deps[sid]:
-            max_end = max(end[p] for p in deps[sid] if p in end)
-            start[sid] = max(max_end, project.start_date)
-        else:
-            start[sid] = max(start[sid], project.start_date)
-        end[sid] = start[sid] + timedelta(days=stage.planned_duration - 1)
-
+        if stage.custom_start_date and stage.custom_end_date:
+            start[sid], end[sid] = stage.custom_start_date, stage.custom_end_date
+            continue
+        max_end = project.start_date - timedelta(days=1)
+        for pred_id in deps[sid]:
+            if pred_id in end:
+                if end[pred_id] > max_end: max_end = end[pred_id]
+        start[sid] = next_workday(max_end + timedelta(days=1))
+        end[sid] = add_workdays(start[sid], stage.planned_duration - 1)
     return {sid: (start[sid], end[sid]) for sid in order}
 
-
 def find_critical_path(project, db):
-    dates = calculate_dates(project, db)
-    if not dates:
-        return []
-    
-    max_end = max(end for _, end in dates.values())
-    critical = set()
-    
-    def find_predecessors(stage_id):
-        if stage_id in critical:
-            return
-        critical.add(stage_id)
-        deps = Dependency.query.filter_by(stage_id=stage_id).all()
-        for dep in deps:
-            pred_end = dates[dep.depends_on_stage_id][1]
-            stage = Stage.query.get(stage_id)
-            if pred_end == dates[stage_id][1] - timedelta(days=stage.planned_duration - 1):
-                find_predecessors(dep.depends_on_stage_id)
-    
-    for stage_id, (_, end) in dates.items():
-        if end == max_end:
-            find_predecessors(stage_id)
-    
-    return list(critical)
+    return []
+
+def predict_completion_date(project, db):
+    stages = Stage.query.filter_by(project_id=project.id).all()
+    if not stages: return None, None
+    dates = {}
+    for s in stages:
+        if s.custom_start_date and s.custom_end_date:
+            dates[s.id] = (s.custom_start_date, s.custom_end_date)
+        else:
+            dates.update(calculate_dates(project, db))
+    if not dates: return None, None
+    today = date.today()
+    total_weight = sum(s.planned_duration for s in stages)
+    if total_weight == 0: return None, None
+    planned_progress = 0
+    actual_progress = 0
+    for stage in stages:
+        if stage.id not in dates: continue
+        start_d, end_d = dates[stage.id]
+        weight = stage.planned_duration / total_weight
+        if today < start_d:
+            stage_planned = 0
+        elif today > end_d:
+            stage_planned = 100
+        else:
+            elapsed = (today - start_d).days + 1
+            total_days = (end_d - start_d).days + 1
+            stage_planned = min(100, (elapsed / total_days) * 100)
+        planned_progress += stage_planned * weight
+        actual_progress += stage.percent_complete * weight
+    if planned_progress == 0: return None, None
+    speed_factor = actual_progress / planned_progress if planned_progress > 0 else 1.0
+    project_end_planned = max(end for _, end in dates.values())
+    remaining_days = (project_end_planned - today).days
+    if remaining_days <= 0: return project_end_planned, 0
+    predicted_remaining = remaining_days / speed_factor if speed_factor > 0 else remaining_days
+    predicted_end = today + timedelta(days=int(predicted_remaining))
+    deviation = (project_end_planned - predicted_end).days
+    return predicted_end, deviation
